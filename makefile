@@ -1,4 +1,3 @@
-.RECIPEPREFIX := >
 CC       := arm-none-eabi-gcc
 OBJCOPY  := arm-none-eabi-objcopy
 SIZE     := arm-none-eabi-size
@@ -35,13 +34,13 @@ MAKEFILE_PATH := $(abspath $(firstword $(MAKEFILE_LIST)))
 define PROJECT_template
 .PHONY: $(1) flash-$(1) clean-$(1)
 $(1):
->$$(MAKE) -C $(1) -f $$(MAKEFILE_PATH) $(1)
+	$$(MAKE) -C $(1) -f $$(MAKEFILE_PATH) $(1)
 
 flash-$(1):
->$$(MAKE) -C $(1) -f $$(MAKEFILE_PATH) flash-$(1)
+	$$(MAKE) -C $(1) -f $$(MAKEFILE_PATH) flash-$(1)
 
 clean-$(1):
->$$(MAKE) -C $(1) -f $$(MAKEFILE_PATH) clean
+	$$(MAKE) -C $(1) -f $$(MAKEFILE_PATH) clean
 endef
 
 $(foreach proj,$(PROJECTS),$(eval $(call PROJECT_template,$(proj))))
@@ -74,52 +73,52 @@ HDRS_$(1) := $$(shell $(CC) $(CFLAGS) -MM $(SRC_DIR)/$(1).c 2>/dev/null \
 OBJS_$(1) := $(OBJ_DIR)/$(1).o $$(patsubst $(HDR_DIR)/%.h,$(OBJ_DIR)/headers/%.o,$$(HDRS_$(1))) $(COMMON_OBJS)
 
 $(BIN_DIR)/$(1).elf: $$(OBJS_$(1)) $(LINKER_SCRIPT) | $(BIN_DIR)
->$(CC) $(MCU) -T$(LINKER_SCRIPT) -Wl,--gc-sections -Wl,-Map=$(BIN_DIR)/$(1).map -nostartfiles $$(filter-out $(LINKER_SCRIPT),$$^) -o $$@
->$(SIZE) $$@
->$(OBJCOPY) -O ihex $$@ $(BIN_DIR)/$(1).hex
->$(OBJCOPY) -O binary $$@ $(BIN_DIR)/$(1).bin
+	$(CC) $(MCU) -T$(LINKER_SCRIPT) -Wl,--gc-sections -Wl,-Map=$(BIN_DIR)/$(1).map -nostartfiles $$(filter-out $(LINKER_SCRIPT),$$^) -o $$@
+	$(SIZE) $$@
+	$(OBJCOPY) -O ihex $$@ $(BIN_DIR)/$(1).hex
+	$(OBJCOPY) -O binary $$@ $(BIN_DIR)/$(1).bin
 
 # make blink -> build only, no flash
 $(1): $(BIN_DIR)/$(1).elf
->@:
+	@:
 
 # make flash-blink -> build + program via OpenOCD/ST-Link
 flash-$(1): $(BIN_DIR)/$(1).elf
->openocd -f interface/stlink.cfg -f target/stm32g4x.cfg \
->  -c "program $$< verify reset exit"
+	openocd -f interface/stlink.cfg -f target/stm32g4x.cfg \
+	  -c "program $$< verify reset exit"
 endef
 
 $(foreach prog,$(PROGRAMS),$(eval $(call PROGRAM_template,$(prog))))
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
->$(CC) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/headers/%.o: $(HDR_DIR)/%.c | $(OBJ_DIR)/headers
->$(CC) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/startup_stm32g474xx.o: $(STARTUP_DIR)/startup_stm32g474xx.s | $(OBJ_DIR)
->$(CC) $(MCU) -c $< -o $@
+	$(CC) $(MCU) -c $< -o $@
 
 $(OBJ_DIR)/system_stm32g4xx.o: $(STARTUP_DIR)/system_stm32g4xx.c | $(OBJ_DIR)
->$(CC) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 
 $(OBJ_DIR) $(OBJ_DIR)/headers $(BIN_DIR):
->mkdir -p $@
+	mkdir -p $@
 
 -include $(wildcard $(OBJ_DIR)/*.d $(OBJ_DIR)/headers/*.d)
 
 clean:
 ifneq ($(CLEAN_TARGETS),)
->@for p in $(CLEAN_TARGETS); do rm -rf $$p/bin; echo "cleaned $$p/bin"; done
+	@for p in $(CLEAN_TARGETS); do rm -rf $$p/bin; echo "cleaned $$p/bin"; done
 else
->rm -rf $(BIN_DIR)
+	rm -rf $(BIN_DIR)
 endif
 
 list:
->@for d in */; do \
->  d=$${d%/}; \
->  if ls $$d/src/*.c >/dev/null 2>&1; then \
->    echo "$$d:"; \
->    for f in $$d/src/*.c; do echo "  $$(basename "$$f" .c)"; done; \
->  fi; \
->done
+	@for d in */; do \
+	  d=$${d%/}; \
+	  if ls $$d/src/*.c >/dev/null 2>&1; then \
+	    echo "$$d:"; \
+	    for f in $$d/src/*.c; do echo "  $$(basename "$$f" .c)"; done; \
+	  fi; \
+	done
