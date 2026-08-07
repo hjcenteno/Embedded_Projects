@@ -85,6 +85,7 @@ $(1): $(BIN_DIR)/$(1).elf
 # make flash-blink -> build + program via OpenOCD/ST-Link
 flash-$(1): $(BIN_DIR)/$(1).elf
 	openocd -f interface/stlink.cfg -f target/stm32g4x.cfg \
+	  -c "reset_config srst_only srst_nogate connect_assert_srst" \
 	  -c "program $$< verify reset exit"
 endef
 
