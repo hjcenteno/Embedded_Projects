@@ -1,0 +1,19 @@
+{
+    "configurations": [
+        {
+            "name": "STM32G474",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${env:HOME}/cmsis_core/CMSIS/Core/Include",
+                "${env:HOME}/cmsis_device_g4/Include"
+            ],
+            "defines": [
+                "STM32G474xx"
+            ],
+            "compilerPath": "/usr/bin/arm-none-eabi-gcc",
+            "cStandard": "gnu11",
+            "intelliSenseMode": "linux-gcc-arm"
+        }
+    ],
+    "version": 4
+}

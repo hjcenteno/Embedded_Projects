@@ -1,6 +1,7 @@
 /*
     Author: Henry Centeno
     Description: This file contains the implementation of the blinking LED for the nucleo_g474re board.
+    For this usage, I wired an external LED to D7 on the board. Both LD2 and that pin will receive power.
 */
 
 #include "stm32g474xx.h"
