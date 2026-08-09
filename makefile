@@ -57,6 +57,26 @@ $(eval $(CLEAN_TARGETS):;@:)
 endif
 endif
 
+# `make project <name>`: scaffold a new project directory with a
+# starter source file and open it. Extra word after "project" is
+# the name, not a build target (same trick as `clean` above).
+ifeq (project,$(firstword $(MAKECMDGOALS)))
+PROJECT_NAME := $(word 2,$(MAKECMDGOALS))
+ifneq ($(PROJECT_NAME),)
+$(eval $(PROJECT_NAME):;@:)
+endif
+endif
+
+.PHONY: project
+project:
+ifeq ($(PROJECT_NAME),)
+	$(error Usage: make project <name>)
+endif
+	mkdir -p $(PROJECT_NAME)
+	mkdir -p $(PROJECT_NAME)/src
+	touch $(PROJECT_NAME)/src/$(PROJECT_NAME).c
+	code $(PROJECT_NAME)/src/$(PROJECT_NAME).c
+
 # Disable make's built-in implicit rules/variables -- same reasoning as
 # on the host side: avoids silent fallback to the wrong compiler/flags.
 MAKEFLAGS += -r -R

@@ -16,6 +16,10 @@ int main(void){
     RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN; //activate the timer
     RCC->AHB2ENR |= RCC_AHB2ENR_GPIOBEN;
     
+    /*
+        Because the button is wired as reading a signal from the 3.3V, then sending the signal to D10 through the resistor,
+        the moder can be left as 00 when we set the bits.
+    */
     //setting the moder for pb10, this will act as the button
     GPIOB->MODER &= ~GPIO_MODER_MODE10;
     GPIOB->PUPDR &= ~GPIO_MODER_MODE10;
