@@ -16,6 +16,9 @@
 *.gch
 *.pch
 
+#binaries
+*.bin
+
 # Libraries
 *.lib
 *.a

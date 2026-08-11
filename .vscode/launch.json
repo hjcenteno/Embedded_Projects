@@ -1,0 +1,30 @@
+// Use IntelliSense to learn about possible attributes.
+// Hover to view descriptions of existing attributes.
+// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug STM32 project",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/${input:projectName}/bin/${input:projectName}.elf",
+            "request": "launch",
+            "type": "cortex-debug",
+            "servertype": "openocd",
+            "configFiles": [
+                "interface/stlink.cfg",
+                "target/stm32g4x.cfg"
+            ],
+            "device": "STM32G474RE",
+            "runToEntryPoint": "main",
+            "preLaunchTask": "Build project"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "projectName",
+            "type": "promptString",
+            "description": "Project folder name (must match its src/<name>.c program name)"
+        }
+    ]
+}
