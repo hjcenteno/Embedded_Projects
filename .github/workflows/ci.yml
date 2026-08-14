@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [DEV]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build (warnings as errors)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi cmake
+
+      - name: Set up environment (CMSIS, startup, linker)
+        run: cmake -P bootstrap.cmake
+
+      - name: Build every project with -Werror
+        run: |
+          for d in */; do
+            d=${d%/}
+            if ls "$d"/src/*.c >/dev/null 2>&1; then
+              echo "== Building $d =="
+              make -C "$d" -f "$PWD/Makefile" "$d" WERROR=-Werror
+            fi
+          done
+
+  static-analysis:
+    name: cppcheck + clang-tidy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck clang-tidy gcc-arm-none-eabi cmake
+
+      - name: Set up environment (CMSIS, startup, linker)
+        run: cmake -P bootstrap.cmake
+
+      - name: cppcheck
+        run: |
+          FILES=$(find . -path '*/src/*.c')
+          if [ -z "$FILES" ]; then
+            echo "No .c files found -- check .gitignore / branch tracking."
+            exit 1
+          fi
+          cppcheck \
+            --enable=warning,style,performance,portability \
+            --std=c11 \
+            --suppress=missingIncludeSystem \
+            -I "$HOME/cmsis_core/CMSIS/Core/Include" \
+            -I "$HOME/cmsis_device_g4/Include" \
+            --error-exitcode=1 \
+            $FILES
+
+      - name: clang-tidy
+        run: |
+          FILES=$(find . -path '*/src/*.c')
+          for f in $FILES; do
+            clang-tidy "$f" \
+              --checks='bugprone-*,clang-analyzer-*,cert-*' \
+              -- -I"$HOME/cmsis_core/CMSIS/Core/Include" \
+                 -I"$HOME/cmsis_device_g4/Include" \
+                 -DSTM32G474xx --target=arm-none-eabi -mcpu=cortex-m4 -mthumb
+          done
+
+  clang-static-analyzer:
+    name: Clang Static Analyzer (dataflow checks -- important for UART/parsing code)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi cmake clang
+          pip install --user scan-build
+
+      - name: Set up environment (CMSIS, startup, linker)
+        run: cmake -P bootstrap.cmake
+
+      - name: Run scan-build across every project
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          for d in */; do
+            d=${d%/}
+            if ls "$d"/src/*.c >/dev/null 2>&1; then
+              echo "== Analyzing $d =="
+              scan-build --status-bugs make -C "$d" -f "$PWD/Makefile" "$d"
+            fi
+          done
