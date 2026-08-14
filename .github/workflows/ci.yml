@@ -25,7 +25,7 @@ jobs:
             d=${d%/}
             if ls "$d"/src/*.c >/dev/null 2>&1; then
               echo "== Building $d =="
-              make -C "$d" -f "$PWD/Makefile" "$d"
+              make -C "$d" -f "$PWD/makefile" "$d"
             fi
           done
 
