@@ -54,6 +54,8 @@ jobs:
             --enable=warning,style,performance,portability \
             --std=c11 \
             --suppress=missingIncludeSystem \
+            --suppress=toomanyconfigs \
+            --suppress=constVariablePointer:*/cmsis_core/*:*/cmsis_device_g4/* \
             -I "$HOME/cmsis_core/CMSIS/Core/Include" \
             -I "$HOME/cmsis_device_g4/Include" \
             --error-exitcode=1 \
@@ -79,19 +81,23 @@ jobs:
       - name: Install toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-arm-none-eabi cmake clang
-          pip install --user scan-build
+          sudo apt-get install -y gcc-arm-none-eabi cmake clang clang-tools
 
       - name: Set up environment (CMSIS, startup, linker)
         run: cmake -P bootstrap.cmake
 
       - name: Run scan-build across every project
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
+          SCAN_BUILD=$(command -v scan-build || find /usr/lib/llvm-*/bin /usr/bin -maxdepth 1 -name 'scan-build*' 2>/dev/null | sort -V | tail -1)
+          if [ -z "$SCAN_BUILD" ]; then
+            echo "Could not locate a scan-build binary after installing clang-tools."
+            exit 1
+          fi
+          echo "Using $SCAN_BUILD"
           for d in */; do
             d=${d%/}
             if ls "$d"/src/*.c >/dev/null 2>&1; then
               echo "== Analyzing $d =="
-              scan-build --status-bugs make -C "$d" -f "$PWD/Makefile" "$d"
+              "$SCAN_BUILD" --status-bugs make -C "$d" -f "$PWD/makefile" "$d"
             fi
           done
