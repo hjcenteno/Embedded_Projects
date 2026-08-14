@@ -64,12 +64,15 @@ jobs:
 
       - name: clang-tidy
         run: |
+          GCC_INCLUDES=$(echo | arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -E -Wp,-v -xc - 2>&1 \
+            | sed -n '/search starts here/,/End of search/p' | grep '^ ' | sed 's/^ /-I/')
           FILES=$(find . -path '*/src/*.c')
           for f in $FILES; do
             clang-tidy "$f" \
               --checks='bugprone-*,clang-analyzer-*,cert-*' \
               -- -I"$HOME/cmsis_core/CMSIS/Core/Include" \
                  -I"$HOME/cmsis_device_g4/Include" \
+                 $GCC_INCLUDES \
                  -DSTM32G474xx --target=arm-none-eabi -mcpu=cortex-m4 -mthumb
           done
 
