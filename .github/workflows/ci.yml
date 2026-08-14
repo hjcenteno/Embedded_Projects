@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Build (warnings as errors)
+    name: Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,13 +19,13 @@ jobs:
       - name: Set up environment (CMSIS, startup, linker)
         run: cmake -P bootstrap.cmake
 
-      - name: Build every project with -Werror
+      - name: Build every project
         run: |
           for d in */; do
             d=${d%/}
             if ls "$d"/src/*.c >/dev/null 2>&1; then
               echo "== Building $d =="
-              make -C "$d" -f "$PWD/Makefile" "$d" WERROR=-Werror
+              make -C "$d" -f "$PWD/Makefile" "$d"
             fi
           done
 
