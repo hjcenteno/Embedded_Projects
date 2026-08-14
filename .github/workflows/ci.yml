@@ -55,7 +55,8 @@ jobs:
             --std=c11 \
             --suppress=missingIncludeSystem \
             --suppress=toomanyconfigs \
-            --suppress=constVariablePointer:*/cmsis_core/*:*/cmsis_device_g4/* \
+            --suppress=constVariablePointer:*/cmsis_core/* \
+            --suppress=constVariablePointer:*/cmsis_device_g4/* \
             -I "$HOME/cmsis_core/CMSIS/Core/Include" \
             -I "$HOME/cmsis_device_g4/Include" \
             --error-exitcode=1 \
@@ -94,6 +95,7 @@ jobs:
             exit 1
           fi
           echo "Using $SCAN_BUILD"
+          export CCC_CC=arm-none-eabi-gcc
           for d in */; do
             d=${d%/}
             if ls "$d"/src/*.c >/dev/null 2>&1; then
