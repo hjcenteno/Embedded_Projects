@@ -39,7 +39,9 @@ jobs:
 
   static-analysis:
     name: cppcheck + clang-tidy
+    needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -69,6 +71,10 @@ jobs:
           cppcheck \
             --enable=warning,style,performance,portability \
             --std=c11 \
+            --max-configs=1 \
+            -D__GNUC__ \
+            -DSTM32G474xx \
+            -j$(nproc) \
             --suppress=missingIncludeSystem \
             --suppress=toomanyconfigs \
             --suppress=constVariablePointer:*/cmsis_core/* \
@@ -97,6 +103,7 @@ jobs:
 
   clang-static-analyzer:
     name: Clang Static Analyzer (dataflow checks -- important for UART/parsing code)
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
