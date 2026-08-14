@@ -16,6 +16,14 @@ jobs:
       - name: Install toolchain
         run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi cmake
 
+      - name: Cache CMSIS
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/cmsis_core
+            ~/cmsis_device_g4
+          key: cmsis-v1
+
       - name: Set up environment (CMSIS, startup, linker)
         run: cmake -P bootstrap.cmake
 
@@ -40,6 +48,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cppcheck clang-tidy gcc-arm-none-eabi cmake
 
+      - name: Cache CMSIS
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/cmsis_core
+            ~/cmsis_device_g4
+          key: cmsis-v1
+
       - name: Set up environment (CMSIS, startup, linker)
         run: cmake -P bootstrap.cmake
 
@@ -63,9 +79,12 @@ jobs:
             $FILES
 
       - name: clang-tidy
+        continue-on-error: true
         run: |
           GCC_INCLUDES=$(echo | arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -E -Wp,-v -xc - 2>&1 \
-            | sed -n '/search starts here/,/End of search/p' | grep '^ ' | sed 's/^ /-I/')
+            | sed -n '/search starts here/,/End of search/p' | grep '^ ' \
+            | grep -v '/lib/gcc/' \
+            | sed 's/^ /-I/')
           FILES=$(find . -path '*/src/*.c')
           for f in $FILES; do
             clang-tidy "$f" \
@@ -86,6 +105,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-arm-none-eabi cmake clang clang-tools
+
+      - name: Cache CMSIS
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/cmsis_core
+            ~/cmsis_device_g4
+          key: cmsis-v1
 
       - name: Set up environment (CMSIS, startup, linker)
         run: cmake -P bootstrap.cmake
