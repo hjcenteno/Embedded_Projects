@@ -3,8 +3,31 @@ name: CI
 on:
   push:
     branches: [DEV]
+    paths:
+      - '**.c'
+      - '**.h'
+      - 'makefile'
+      - 'bootstrap.cmake'
+      - 'linker/**'
+      - 'startup/**'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [main]
+    paths:
+      - '**.c'
+      - '**.h'
+      - 'makefile'
+      - 'bootstrap.cmake'
+      - 'linker/**'
+      - 'startup/**'
+      - '.github/workflows/ci.yml'
+
+# Cancel superseded runs, but key by event name too so a push-triggered run
+# and a pull_request-triggered run never cancel each other -- branch
+# protection treats a cancelled required check as failing.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ci:
