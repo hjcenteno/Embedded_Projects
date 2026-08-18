@@ -7,9 +7,10 @@ on:
     branches: [main]
 
 jobs:
-  build:
-    name: Build
+  ci:
+    name: Build, static analysis, dataflow checks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -17,10 +18,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /var/cache/apt/archives
-          key: apt-arm-toolchain-v1
+          key: apt-arm-toolchain-v3
 
-      - name: Install toolchain
-        run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi cmake
+      - name: Install toolchain (no-recommends -- skips an unneeded 463MB C++ package)
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            gcc-arm-none-eabi libnewlib-arm-none-eabi \
+            cppcheck clang-tidy clang clang-tools cmake
 
       - name: Cache CMSIS
         uses: actions/cache@v4
@@ -42,36 +47,6 @@ jobs:
               make -C "$d" -f "$PWD/makefile" "$d"
             fi
           done
-
-  static-analysis:
-    name: cppcheck + clang-tidy
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Cache apt packages
-        uses: actions/cache@v4
-        with:
-          path: /var/cache/apt/archives
-          key: apt-arm-toolchain-v1
-
-      - name: Install tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cppcheck clang-tidy gcc-arm-none-eabi cmake
-
-      - name: Cache CMSIS
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/cmsis_core
-            ~/cmsis_device_g4
-          key: cmsis-v1
-
-      - name: Set up environment (CMSIS, startup, linker)
-        run: cmake -P bootstrap.cmake
 
       - name: cppcheck
         run: |
@@ -122,35 +97,6 @@ jobs:
                  -DSTM32G474xx --target=arm-none-eabi -mcpu=cortex-m4 -mthumb
           done
 
-  clang-static-analyzer:
-    name: Clang Static Analyzer (dataflow checks -- important for UART/parsing code)
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Cache apt packages
-        uses: actions/cache@v4
-        with:
-          path: /var/cache/apt/archives
-          key: apt-arm-toolchain-v1
-
-      - name: Install toolchain
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-arm-none-eabi cmake clang clang-tools
-
-      - name: Cache CMSIS
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/cmsis_core
-            ~/cmsis_device_g4
-          key: cmsis-v1
-
-      - name: Set up environment (CMSIS, startup, linker)
-        run: cmake -P bootstrap.cmake
-
       - name: Run scan-build across every project
         run: |
           SCAN_BUILD=$(command -v scan-build || find /usr/lib/llvm-*/bin /usr/bin -maxdepth 1 -name 'scan-build*' 2>/dev/null | sort -V | tail -1)
@@ -160,6 +106,7 @@ jobs:
           fi
           echo "Using $SCAN_BUILD"
           export CCC_CC=arm-none-eabi-gcc
+          export CLANG_ANALYZER_TARGET=arm-none-eabi
           for d in */; do
             d=${d%/}
             if ls "$d"/src/*.c >/dev/null 2>&1; then
