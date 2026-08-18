@@ -63,24 +63,30 @@ jobs:
 
       - name: cppcheck
         run: |
-          FILES=$(find . -path '*/src/*.c')
+          FILES=$(find . -path '*/src/*.c' -o -path './lib/*/*.c')
           if [ -z "$FILES" ]; then
             echo "No .c files found -- check .gitignore / branch tracking."
             exit 1
           fi
+          HDR_INCLUDES=$(find . -type d -path '*/src/headers' | sed 's/^/-I/')
           cppcheck \
             --enable=warning,style,performance,portability \
             --std=c11 \
             --max-configs=1 \
             -D__GNUC__ \
+            -D__ARM_ARCH_7EM__=1 \
             -DSTM32G474xx \
             -j$(nproc) \
             --suppress=missingIncludeSystem \
             --suppress=toomanyconfigs \
             --suppress=constVariablePointer:*/cmsis_core/* \
             --suppress=constVariablePointer:*/cmsis_device_g4/* \
+            --suppress=preprocessorErrorDirective:*/cmsis_core/* \
+            --suppress=preprocessorErrorDirective:*/cmsis_device_g4/* \
             -I "$HOME/cmsis_core/CMSIS/Core/Include" \
             -I "$HOME/cmsis_device_g4/Include" \
+            -I lib \
+            $HDR_INCLUDES \
             --error-exitcode=1 \
             $FILES
 
@@ -91,12 +97,15 @@ jobs:
             | sed -n '/search starts here/,/End of search/p' | grep '^ ' \
             | grep -v '/lib/gcc/' \
             | sed 's/^ /-I/')
-          FILES=$(find . -path '*/src/*.c')
+          FILES=$(find . -path '*/src/*.c' -o -path './lib/*/*.c')
+          HDR_INCLUDES=$(find . -type d -path '*/src/headers' | sed 's/^/-I/')
           for f in $FILES; do
             clang-tidy "$f" \
               --checks='bugprone-*,clang-analyzer-*,cert-*' \
               -- -I"$HOME/cmsis_core/CMSIS/Core/Include" \
                  -I"$HOME/cmsis_device_g4/Include" \
+                 -Ilib \
+                 $HDR_INCLUDES \
                  $GCC_INCLUDES \
                  -DSTM32G474xx --target=arm-none-eabi -mcpu=cortex-m4 -mthumb
           done
