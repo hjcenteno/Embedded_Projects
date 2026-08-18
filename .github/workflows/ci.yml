@@ -14,12 +14,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache apt packages
-        uses: actions/cache@v4
-        with:
-          path: /var/cache/apt/archives
-          key: apt-arm-toolchain-v3
-
       - name: Install toolchain (no-recommends -- skips an unneeded 463MB C++ package)
         run: |
           sudo apt-get update
