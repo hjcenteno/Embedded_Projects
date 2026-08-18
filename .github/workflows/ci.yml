@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [DEV]
+    paths:
+      - '**.c'
+      - '**.h'
+      - 'makefile'
+      - 'bootstrap.cmake'
+      - 'linker/**'
+      - 'startup/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - '**.c'
+      - '**.h'
+      - 'makefile'
+      - 'bootstrap.cmake'
+      - 'linker/**'
+      - 'startup/**'
+      - '.github/workflows/ci.yml'
+
+# Cancel superseded runs, but key by event name too so a push-triggered run
+# and a pull_request-triggered run never cancel each other -- branch
+# protection treats a cancelled required check as failing.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Build, static analysis, dataflow checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain (no-recommends -- skips an unneeded 463MB C++ package)
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            gcc-arm-none-eabi libnewlib-arm-none-eabi \
+            cppcheck clang-tidy clang clang-tools cmake
+
+      - name: Cache CMSIS
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/cmsis_core
+            ~/cmsis_device_g4
+          key: cmsis-v1
+
+      - name: Set up environment (CMSIS, startup, linker)
+        run: cmake -P bootstrap.cmake
+
+      - name: Build every project
+        run: |
+          for d in */; do
+            d=${d%/}
+            if ls "$d"/src/*.c >/dev/null 2>&1; then
+              echo "== Building $d =="
+              make -C "$d" -f "$PWD/makefile" "$d"
+            fi
+          done
+
+      - name: cppcheck
+        run: |
+          FILES=$(find . -path '*/src/*.c' -o -path './lib/*/*.c')
+          if [ -z "$FILES" ]; then
+            echo "No .c files found -- check .gitignore / branch tracking."
+            exit 1
+          fi
+          HDR_INCLUDES=$(find . -type d -path '*/src/headers' | sed 's/^/-I/')
+          cppcheck \
+            --enable=warning,style,performance,portability \
+            --std=c11 \
+            --max-configs=1 \
+            -D__GNUC__ \
+            -D__ARM_ARCH_7EM__=1 \
+            -DSTM32G474xx \
+            -j$(nproc) \
+            --suppress=missingIncludeSystem \
+            --suppress=toomanyconfigs \
+            --suppress=constVariablePointer:*/cmsis_core/* \
+            --suppress=constVariablePointer:*/cmsis_device_g4/* \
+            --suppress=preprocessorErrorDirective:*/cmsis_core/* \
+            --suppress=preprocessorErrorDirective:*/cmsis_device_g4/* \
+            -I "$HOME/cmsis_core/CMSIS/Core/Include" \
+            -I "$HOME/cmsis_device_g4/Include" \
+            -I lib \
+            $HDR_INCLUDES \
+            --error-exitcode=1 \
+            $FILES
+
+      - name: clang-tidy
+        continue-on-error: true
+        run: |
+          GCC_INCLUDES=$(echo | arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -E -Wp,-v -xc - 2>&1 \
+            | sed -n '/search starts here/,/End of search/p' | grep '^ ' \
+            | grep -v '/lib/gcc/' \
+            | sed 's/^ /-I/')
+          FILES=$(find . -path '*/src/*.c' -o -path './lib/*/*.c')
+          HDR_INCLUDES=$(find . -type d -path '*/src/headers' | sed 's/^/-I/')
+          for f in $FILES; do
+            clang-tidy "$f" \
+              --checks='bugprone-*,clang-analyzer-*,cert-*' \
+              -- -I"$HOME/cmsis_core/CMSIS/Core/Include" \
+                 -I"$HOME/cmsis_device_g4/Include" \
+                 -Ilib \
+                 $HDR_INCLUDES \
+                 $GCC_INCLUDES \
+                 -DSTM32G474xx --target=arm-none-eabi -mcpu=cortex-m4 -mthumb
+          done
+
+      - name: Run scan-build across every project
+        run: |
+          SCAN_BUILD=$(command -v scan-build || find /usr/lib/llvm-*/bin /usr/bin -maxdepth 1 -name 'scan-build*' 2>/dev/null | sort -V | tail -1)
+          if [ -z "$SCAN_BUILD" ]; then
+            echo "Could not locate a scan-build binary after installing clang-tools."
+            exit 1
+          fi
+          echo "Using $SCAN_BUILD"
+          export CCC_CC=arm-none-eabi-gcc
+          export CLANG_ANALYZER_TARGET=arm-none-eabi
+          for d in */; do
+            d=${d%/}
+            if ls "$d"/src/*.c >/dev/null 2>&1; then
+              echo "== Analyzing $d =="
+              "$SCAN_BUILD" --status-bugs make -C "$d" -f "$PWD/makefile" "$d"
+            fi
+          done

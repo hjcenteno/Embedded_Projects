@@ -15,8 +15,11 @@ LINKER_SCRIPT := ../linker/STM32G474RE_FLASH.ld
 BIN_DIR       := bin
 OBJ_DIR       := $(BIN_DIR)/obj
 
+LIB_DIR       := ../lib
+
 CFLAGS   := $(MCU) -Wall -Wextra -g -O0 -std=gnu11 -DSTM32G474xx \
             -I$(HDR_DIR) \
+            -I$(LIB_DIR) \
             -I$(CMSIS_CORE)/CMSIS/Core/Include \
             -I$(CMSIS_DEVICE)/Include
 DEPFLAGS := -MMD -MP
@@ -86,11 +89,17 @@ all: $(addprefix $(BIN_DIR)/,$(addsuffix .elf,$(PROGRAMS)))
 
 COMMON_OBJS := $(OBJ_DIR)/startup_stm32g474xx.o $(OBJ_DIR)/system_stm32g4xx.o
 
+# Shared driver code in ../lib/<driver>/*.c -- compiled and linked into
+# every project. Unused code is stripped at link time by --gc-sections,
+# so projects that don't call a driver don't pay for it in flash.
+LIB_SRCS := $(wildcard $(LIB_DIR)/*/*.c)
+LIB_OBJS := $(patsubst $(LIB_DIR)/%.c,$(OBJ_DIR)/lib/%.o,$(LIB_SRCS))
+
 define PROGRAM_template
 HDRS_$(1) := $$(shell $(CC) $(CFLAGS) -MM $(SRC_DIR)/$(1).c 2>/dev/null \
                | tr -d '\\' | tr ' ' '\n' \
                | grep -E '^$(HDR_DIR)/.*\.h$$$$')
-OBJS_$(1) := $(OBJ_DIR)/$(1).o $$(patsubst $(HDR_DIR)/%.h,$(OBJ_DIR)/headers/%.o,$$(HDRS_$(1))) $(COMMON_OBJS)
+OBJS_$(1) := $(OBJ_DIR)/$(1).o $$(patsubst $(HDR_DIR)/%.h,$(OBJ_DIR)/headers/%.o,$$(HDRS_$(1))) $(LIB_OBJS) $(COMMON_OBJS)
 
 $(BIN_DIR)/$(1).elf: $$(OBJS_$(1)) $(LINKER_SCRIPT) | $(BIN_DIR)
 	$(CC) $(MCU) -T$(LINKER_SCRIPT) -Wl,--gc-sections -Wl,-Map=$(BIN_DIR)/$(1).map -nostartfiles $$(filter-out $(LINKER_SCRIPT),$$^) -o $$@
@@ -117,6 +126,10 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 $(OBJ_DIR)/headers/%.o: $(HDR_DIR)/%.c | $(OBJ_DIR)/headers
 	$(CC) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 
+$(OBJ_DIR)/lib/%.o: $(LIB_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
+
 $(OBJ_DIR)/startup_stm32g474xx.o: $(STARTUP_DIR)/startup_stm32g474xx.s | $(OBJ_DIR)
 	$(CC) $(MCU) -c $< -o $@
 
@@ -126,7 +139,7 @@ $(OBJ_DIR)/system_stm32g4xx.o: $(STARTUP_DIR)/system_stm32g4xx.c | $(OBJ_DIR)
 $(OBJ_DIR) $(OBJ_DIR)/headers $(BIN_DIR):
 	mkdir -p $@
 
--include $(wildcard $(OBJ_DIR)/*.d $(OBJ_DIR)/headers/*.d)
+-include $(wildcard $(OBJ_DIR)/*.d $(OBJ_DIR)/headers/*.d $(OBJ_DIR)/lib/*/*.d)
 
 clean:
 ifneq ($(CLEAN_TARGETS),)

@@ -25,9 +25,13 @@ message(STATUS "Found arm-none-eabi-gcc: ${ARM_GCC}")
 
 find_program(OPENOCD_BIN openocd)
 if(NOT OPENOCD_BIN)
-    message(FATAL_ERROR "openocd not found. Install it with: sudo apt install openocd")
+    message(WARNING
+        "openocd not found -- you won't be able to flash to real hardware.\n"
+        "  Install it with: sudo apt install openocd\n"
+        "  (Not required just to build or run static analysis, e.g. in CI.)")
+else()
+    message(STATUS "Found openocd: ${OPENOCD_BIN}")
 endif()
-message(STATUS "Found openocd: ${OPENOCD_BIN}")
 
 find_program(GIT_EXECUTABLE git)
 if(NOT GIT_EXECUTABLE)
@@ -174,7 +178,5 @@ endif()
 message(STATUS "")
 message(STATUS "== Environment ready ==")
 message(STATUS "  make list                    -- see buildable projects")
-message(STATUS "  make project {project_name}  -- to make a new project directory")
-message(STATUS "  make <project_name>          -- build the project")
+message(STATUS "  make <project_name>          -- build one")
 message(STATUS "  make flash-<project_name>    -- flash it")
-message(STATUS "  make clean <project_name>    -- to clean the bin")
