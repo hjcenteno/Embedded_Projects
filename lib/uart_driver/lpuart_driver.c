@@ -7,14 +7,8 @@
 
 #include "stm32g474xx.h"
 #include "lpuart_driver.h"
-#include <inttypes.h>
-#include "stdio.h"
 
-
-void client_log(){
-}
-
-int server_init_lpuart(){
+int init_lpuart(void){
     /*
         initiates the MCU (client) transmit to the laptop (server).
         return 0 on success
@@ -53,9 +47,21 @@ int server_init_lpuart(){
         11: LSE clock selected as LPUART1 clock*/
     RCC->CCIPR &= ~(RCC_CCIPR_LPUART1SEL);
     RCC->CCIPR |= (RCC_CCIPR_LPUART1SEL_1 | RCC_CCIPR_LPUART1SEL_0); //setting 11 to use the LSE
-    //should I enable the rtc clock to use LSE
     
-    //enable the lpuart peripheral clock
+    //set up the lpuart by following the character transmission procedure laid out on page 1783 of the reference manual
+    //program the M bits to define the word length, going to use (M = 00) for the 8 bit word length
+    LPUART1->CR1 &= ~(USART_CR1_M0 | USART_CR1_M1 | USART_CR1_FIFOEN | USART_CR1_UE); //clear it first, also acts as the set since '00' is the 8-bit character length
+    //utilize the fifo for transmission by setting the fifoen bit (bit 29)
+    LPUART1->CR1 |= (USART_CR1_FIFOEN);
+    //set up the buad rate register, going to use 9600 baud
+    //from table 383, to get 9600 buad, the value programmed is 0x369 when using the LSE clock
+    LPUART1->BRR = 0x369;
+    //going to use 1 stop bit
+    LPUART1->CR2 &= ~(USART_CR2_STOP_0 | USART_CR2_STOP_1); //since'00' is defined as 1 stop bit, this clear ensures that the LPUART will use the 1 stop bit
+    //enable the lpuart by writing '1' to the us bit in cr1
+    LPUART1->CR1 |= (USART_CR1_UE);
+
+
 
     return 0;
 }
