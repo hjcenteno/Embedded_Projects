@@ -1,7 +1,7 @@
-/* 
+/*
     Author: Henry Centeno
-    Description: This button adds upon blinking_led, but instead the user presses a button to turn on the led.
-    I will use D7 again for the led, but the button will be on a different pin
+    Description:
+        LPUART client that will tell the computer whenever the button has been pressed
 
     component | pins | gpio:
     led         d4     pb5
@@ -11,6 +11,7 @@
 */
 
 #include "stm32g474xx.h"
+#include "uart_driver/lpuart_driver.h"
 #include <inttypes.h>
 
 void delay(uint32_t time){
@@ -39,14 +40,17 @@ int main(void){
     GPIOB->MODER &= ~(GPIO_MODER_MODE4 | GPIO_MODER_MODE5); //clear pb4 and pb5 together
     GPIOB->MODER |= (GPIO_MODER_MODE4_0 | GPIO_MODER_MODE5_0); //set pb4 and pb5 together to general io (0b10)
 
+    init_lpuart();
 
     while(1){
+        uint16_t button_state = (uint16_t)GPIOB->IDR;
         if(GPIOB->IDR & GPIO_IDR_IDR_10){ //button state is high
             GPIOA->BSRR = GPIO_BSRR_BS8; //set d7 to high
             delay(500000);
             GPIOB->BSRR = GPIO_BSRR_BS_4; //set d5 to high
             delay(500000);
             GPIOB->BSRR = GPIO_BSRR_BS_5; //set d4 to high
+            client_transmit((uint8_t *)&button_state, sizeof(GPIOB->IDR));
         }
 
         else{ //state is low
@@ -55,6 +59,7 @@ int main(void){
             GPIOB->BSRR = GPIO_BSRR_BR4; //set d5 to low
             delay(500000);
             GPIOB->BSRR = GPIO_BSRR_BR5; //set d4 to low
+            client_transmit((uint8_t *)&button_state, sizeof(GPIOB->IDR));
         }
     }
 }
