@@ -50,7 +50,7 @@ int init_lpuart(void){
     
     //set up the lpuart by following the character transmission procedure laid out on page 1783 of the reference manual
     //program the M bits to define the word length, going to use (M = 00) for the 8 bit word length
-    LPUART1->CR1 &= ~(USART_CR1_M0 | USART_CR1_M1 | USART_CR1_FIFOEN | USART_CR1_UE); //clear it first, also acts as the set since '00' is the 8-bit character length
+    LPUART1->CR1 &= ~(USART_CR1_M0 | USART_CR1_M1 | USART_CR1_FIFOEN | USART_CR1_UE | USART_CR1_TE); //clear it first, also acts as the set since '00' is the 8-bit character length
     //utilize the fifo for transmission by setting the fifoen bit (bit 29)
     LPUART1->CR1 |= (USART_CR1_FIFOEN);
     //set up the buad rate register, going to use 9600 baud
@@ -59,9 +59,8 @@ int init_lpuart(void){
     //going to use 1 stop bit
     LPUART1->CR2 &= ~(USART_CR2_STOP_0 | USART_CR2_STOP_1); //since'00' is defined as 1 stop bit, this clear ensures that the LPUART will use the 1 stop bit
     //enable the lpuart by writing '1' to the us bit in cr1
-    LPUART1->CR1 |= (USART_CR1_UE);
-
-
-
+    LPUART1->CR1 |= (USART_CR1_UE | USART_CR1_TE); //send the first transmission as well
+    while((LPUART1->ISR & USART_ISR_TC) == 0){} //wait until tc is set to 1 to indicate the end of the transmission
+    
     return 0;
 }
