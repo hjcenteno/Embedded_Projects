@@ -43,14 +43,14 @@ int main(void){
     init_lpuart();
 
     while(1){
-        uint16_t button_state = (uint16_t)GPIOB->IDR;
-        if(GPIOB->IDR & GPIO_IDR_IDR_10){ //button state is high
+        uint8_t button_state = (GPIOB->IDR & GPIO_IDR_IDR_10) ? 1 : 0;
+        if(button_state == 1){ //button state is high
             GPIOA->BSRR = GPIO_BSRR_BS8; //set d7 to high
             delay(500000);
             GPIOB->BSRR = GPIO_BSRR_BS_4; //set d5 to high
             delay(500000);
             GPIOB->BSRR = GPIO_BSRR_BS_5; //set d4 to high
-            client_transmit((uint8_t *)&button_state, sizeof(GPIOB->IDR));
+            client_transmit((uint8_t *)&button_state, sizeof(button_state));
         }
 
         else{ //state is low
@@ -59,7 +59,7 @@ int main(void){
             GPIOB->BSRR = GPIO_BSRR_BR4; //set d5 to low
             delay(500000);
             GPIOB->BSRR = GPIO_BSRR_BR5; //set d4 to low
-            client_transmit((uint8_t *)&button_state, sizeof(GPIOB->IDR));
+            client_transmit((uint8_t *)&button_state, sizeof(button_state));
         }
     }
 }
