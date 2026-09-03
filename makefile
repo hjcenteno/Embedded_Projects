@@ -84,6 +84,47 @@ endif
 # on the host side: avoids silent fallback to the wrong compiler/flags.
 MAKEFLAGS += -r -R
 
+# `make lib <name>`: compile a single lib/*/<name>.c file without linking --
+# a fast syntax/compile check for one driver file. <name> can be given as
+# "lpuart_driver", "lpuart_driver.c", or "uart_driver/lpuart_driver.c".
+# Works from the top level (Embedded_Projects/) or from inside a project
+# dir. Extra word after "lib" is the file name, not a build target (same
+# MAKECMDGOALS trick as `clean`/`project` above).
+ifeq (lib,$(firstword $(MAKECMDGOALS)))
+LIB_ARG := $(word 2,$(MAKECMDGOALS))
+ifneq ($(LIB_ARG),)
+$(eval $(LIB_ARG):;@:)
+endif
+endif
+
+.PHONY: lib
+ifneq ($(PROJECTS),)
+# top level: no project dir means LIB_DIR/OBJ_DIR wouldn't resolve here --
+# forward into any one project dir, since lib/ is a shared sibling of all
+# of them and the relative path (../lib) is identical from any project.
+lib:
+ifeq ($(LIB_ARG),)
+	$(error Usage: make lib <name>  e.g. make lib lpuart_driver)
+endif
+	@$(MAKE) -C $(firstword $(PROJECTS)) -f $(MAKEFILE_PATH) lib $(LIB_ARG)
+else
+# nested (inside a project dir): resolve the file and compile it via the
+# existing $(OBJ_DIR)/lib/%.o pattern rule -- no duplicated compile logic.
+LIB_REL := $(basename $(LIB_ARG))
+ifeq ($(findstring /,$(LIB_REL)),)
+LIB_REL := $(patsubst $(LIB_DIR)/%.c,%,$(firstword $(wildcard $(LIB_DIR)/*/$(LIB_REL).c)))
+endif
+
+lib: $(if $(LIB_REL),$(OBJ_DIR)/lib/$(LIB_REL).o)
+ifeq ($(LIB_ARG),)
+	$(error Usage: make lib <name>  e.g. make lib lpuart_driver)
+endif
+ifeq ($(LIB_REL),)
+	$(error No source file found matching '$(LIB_ARG).c' under $(LIB_DIR)/*/)
+endif
+	@echo "compiled $(LIB_DIR)/$(LIB_REL).c -> $(OBJ_DIR)/lib/$(LIB_REL).o"
+endif
+
 .PHONY: all clean list
 all: $(addprefix $(BIN_DIR)/,$(addsuffix .elf,$(PROGRAMS)))
 
