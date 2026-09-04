@@ -35,3 +35,4 @@ This will setup everything the makefile expects and installs:
 - `make {project_name}` to build.
 - `make flash-{project_name}` to flash.
 - `make clean {project_name}` to clean the bin.
+- `make lib {lib src file}` to test compile a lib src file
