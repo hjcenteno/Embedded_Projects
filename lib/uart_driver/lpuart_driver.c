@@ -11,7 +11,6 @@
 int init_lpuart(void){
     /*
         initiates the MCU (client) transmit to the laptop (server).
-        ONLY call this function server side!!!!!
         return 0 on success
     */
 

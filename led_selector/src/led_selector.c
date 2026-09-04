@@ -42,28 +42,36 @@ void components_setup(void){
 int main(void){
     components_setup(); //set up the components on the mcu
 
+    //init the lpuart to transmit the button state
+    init_lpuart();
+
     while(1){
         //get the state of each button pc4, pc5, pa10
-        uint32_t button_state = (GPIO_IDR_IDR_4 | GPIO_IDR_IDR_5 | GPIO_IDR_IDR_10); //idr register is a uint32, so I am using a uint32 for the button state to match the idr
+        uint32_t button_state = 0; //idr register is a uint32, so I am using a uint32 for the button state to match the idr
 
         //whenever the button is high (1), turn the corresponding led
         if(GPIOC->IDR & GPIO_IDR_IDR_5){ //button 1 is pressed
             GPIOB->BSRR = GPIO_BSRR_BS_5; //turn on led 1
+            button_state |= GPIO_IDR_IDR_5;
         }else{
             GPIOB->BSRR = GPIO_BSRR_BR_5; //turn off led 1
         }
 
         if(GPIOC->IDR & GPIO_IDR_IDR_4){ //button 2 is pressed
             GPIOB->BSRR = GPIO_BSRR_BS_4; //turn on led 2
+            button_state |= GPIO_IDR_IDR_4;
         }else{
             GPIOB->BSRR = GPIO_BSRR_BR_4; //turn off led 2
         }
 
         if(GPIOA->IDR & GPIO_IDR_IDR_10){ //button 3 is pressed
             GPIOB->BSRR = GPIO_BSRR_BS_10; //turn on led 3
+            button_state |= GPIO_IDR_IDR_10;
         }else{
             GPIOB->BSRR = GPIO_BSRR_BR_10; //turn off led 3
         }
+
+        client_transmit(&button_state, sizeof(button_state)); //transmit the button state
     }
 
     return 0;
