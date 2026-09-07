@@ -77,7 +77,7 @@ ifeq ($(PROJECT_NAME),)
 endif
 	mkdir -p $(PROJECT_NAME)
 	mkdir -p $(PROJECT_NAME)/src
-	touch $(PROJECT_NAME)/src/$(PROJECT_NAME).c
+	printf '/*\n    author: Henry Centeno\n    description:\n*/\n' > $(PROJECT_NAME)/src/$(PROJECT_NAME).c
 	code $(PROJECT_NAME)/src/$(PROJECT_NAME).c
 
 # Disable make's built-in implicit rules/variables -- same reasoning as
