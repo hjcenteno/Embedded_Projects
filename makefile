@@ -82,14 +82,19 @@ endif
 
 # Disable make's built-in implicit rules/variables -- same reasoning as
 # on the host side: avoids silent fallback to the wrong compiler/flags.
-MAKEFLAGS += -r -R
+# --no-print-directory silences the "Entering/Leaving directory" chatter
+# that GNU Make prints whenever a recursive $(MAKE) -C call happens (used
+# throughout this file for top-level dispatch into project dirs).
+MAKEFLAGS += -r -R --no-print-directory
 
 # `make lib <name>`: compile a single lib/*/<name>.c file without linking --
 # a fast syntax/compile check for one driver file. <name> can be given as
 # "lpuart_driver", "lpuart_driver.c", or "uart_driver/lpuart_driver.c".
+# `make newlib <name>` scaffolds a brand new lib/<name>/ directory instead.
+# `make listlib` enumerates every buildable library (see further down).
 # Works from the top level (Embedded_Projects/) or from inside a project
-# dir. Extra word after "lib" is the file name, not a build target (same
-# MAKECMDGOALS trick as `clean`/`project` above).
+# dir. Extra word after "lib"/"newlib" is the file name, not a build
+# target (same MAKECMDGOALS trick as `clean`/`project` above).
 ifeq (lib,$(firstword $(MAKECMDGOALS)))
 LIB_ARG := $(word 2,$(MAKECMDGOALS))
 ifneq ($(LIB_ARG),)
@@ -97,7 +102,14 @@ $(eval $(LIB_ARG):;@:)
 endif
 endif
 
-.PHONY: lib
+ifeq (newlib,$(firstword $(MAKECMDGOALS)))
+NEWLIB_ARG := $(word 2,$(MAKECMDGOALS))
+ifneq ($(NEWLIB_ARG),)
+$(eval $(NEWLIB_ARG):;@:)
+endif
+endif
+
+.PHONY: lib newlib
 ifneq ($(PROJECTS),)
 # top level: no project dir means LIB_DIR/OBJ_DIR wouldn't resolve here --
 # forward into any one project dir, since lib/ is a shared sibling of all
@@ -107,6 +119,12 @@ ifeq ($(LIB_ARG),)
 	$(error Usage: make lib <name>  e.g. make lib lpuart_driver)
 endif
 	@$(MAKE) -C $(firstword $(PROJECTS)) -f $(MAKEFILE_PATH) lib $(LIB_ARG)
+
+newlib:
+ifeq ($(NEWLIB_ARG),)
+	$(error Usage: make newlib <name>  e.g. make newlib spi_driver)
+endif
+	@$(MAKE) -C $(firstword $(PROJECTS)) -f $(MAKEFILE_PATH) newlib $(NEWLIB_ARG)
 else
 # nested (inside a project dir): resolve the file and compile it via the
 # existing $(OBJ_DIR)/lib/%.o pattern rule -- no duplicated compile logic.
@@ -120,9 +138,33 @@ ifeq ($(LIB_ARG),)
 	$(error Usage: make lib <name>  e.g. make lib lpuart_driver)
 endif
 ifeq ($(LIB_REL),)
-	$(error No source file found matching '$(LIB_ARG).c' under $(LIB_DIR)/*/)
+	$(error No source file found matching '$(LIB_ARG).c' under $(LIB_DIR)/*/ -- use make newlib $(LIB_ARG) to create one)
 endif
 	@echo "compiled $(LIB_DIR)/$(LIB_REL).c -> $(OBJ_DIR)/lib/$(LIB_REL).o"
+
+newlib:
+ifeq ($(NEWLIB_ARG),)
+	$(error Usage: make newlib <name>  e.g. make newlib spi_driver)
+endif
+	mkdir -p $(LIB_DIR)/$(NEWLIB_ARG)
+	printf '/*\n    author: Henry Centeno\n    description:\n*/\n' > $(LIB_DIR)/$(NEWLIB_ARG)/$(NEWLIB_ARG).c
+	printf '/*\n    author: Henry Centeno\n    description:\n*/\n' > $(LIB_DIR)/$(NEWLIB_ARG)/$(NEWLIB_ARG).h
+	@echo "created $(LIB_DIR)/$(NEWLIB_ARG)/$(NEWLIB_ARG).c and $(LIB_DIR)/$(NEWLIB_ARG)/$(NEWLIB_ARG).h"
+endif
+
+# `make listlib`: enumerate every lib/*/*.c file that `make lib <name>`
+# could build, without compiling anything. A separate, single-word target
+# rather than a `lib` sub-argument, so it never collides with the real
+# `list` target below or with MAKECMDGOALS parsing for `lib`.
+.PHONY: listlib
+ifneq ($(PROJECTS),)
+listlib:
+	@$(MAKE) -C $(firstword $(PROJECTS)) -f $(MAKEFILE_PATH) listlib
+else
+LIB_ALL := $(sort $(patsubst $(LIB_DIR)/%.c,%,$(wildcard $(LIB_DIR)/*/*.c)))
+listlib:
+	@echo "Libraries available under $(LIB_DIR)/:"
+	@for l in $(LIB_ALL); do echo "  $$l"; done
 endif
 
 .PHONY: all clean list
@@ -197,3 +239,31 @@ list:
 	    for f in $$d/src/*.c; do echo "  $$(basename "$$f" .c)"; done; \
 	  fi; \
 	done
+
+# `make HELP`: print a summary of every target this Makefile supports.
+# Works the same from the top level or inside a project dir; the last
+# section lists whatever this directory's context actually contains
+# (projects at the top level, programs inside a project dir).
+.PHONY: HELP
+HELP:
+	@echo "Embedded_Projects Makefile -- available targets"
+	@echo ""
+	@echo "Top level (run from Embedded_Projects/):"
+	@echo "  make <project>            to build a project."
+	@echo "  make flash-<project>      to flash it."
+	@echo "  make clean [proj ...]     to remove the bin directory for the named projects. If no project was given, will remove each bin directory in all the project directories."
+	@echo "  make list                 list out every project"
+	@echo "  make project <name>       create a new project dir"
+	@echo "  make lib <name>           compile the given lib source file for a syntax check, does not link"
+	@echo "  make newlib <name>        create a new lib directory for thesource and header files"
+	@echo "  make listlib              list every library available under the lib directory"
+	@echo "  make HELP                 show this message"
+ifneq ($(PROJECTS),)
+	@echo ""
+	@echo "Projects found here:"
+	@for p in $(PROJECTS); do echo "  $$p"; done
+else ifneq ($(PROGRAMS),)
+	@echo ""
+	@echo "Programs found here (src/*.c):"
+	@for p in $(PROGRAMS); do echo "  $$p"; done
+endif
