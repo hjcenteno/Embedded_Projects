@@ -23,6 +23,10 @@ int init_lpuart(void){
     //from af12, pa2 is tx for lpuart. so configure the af registers to the corresponding pins
     GPIOA->AFR[0] &= ~(GPIO_AFRL_AFRL2); //clear the bits
     GPIOA->AFR[0] |= (GPIO_AFRL_AFSEL2_3 | GPIO_AFRL_AFSEL2_2); //af12 maps to pin 2 of gpioa
+
+    //configure the ospeedr register from the datasheet to set the bits to '10'
+    GPIOA->OSPEEDR &= ~(GPIO_OSPEEDR_OSPEED2);
+    GPIOA->OSPEEDR |= GPIO_OSPEEDR_OSPEED2_1; //set it to 10
     
     //enable the pwr interface for backup domain access
     //refer to page 231 of the reference manual 0440 rev 9 for the stm32 g4 series
@@ -59,7 +63,10 @@ int init_lpuart(void){
     //going to use 1 stop bit
     LPUART1->CR2 &= ~(USART_CR2_STOP_0 | USART_CR2_STOP_1); //since'00' is defined as 1 stop bit, this clear ensures that the LPUART will use the 1 stop bit
     //enable the lpuart by writing '1' to the us bit in cr1
-    LPUART1->CR1 |= (USART_CR1_UE | USART_CR1_TE); //send the first transmission as well
+    LPUART1->CR1 |= (USART_CR1_UE | USART_CR1_TE); //send the first transmission as well to test if the LPUART is configured
+    while((LPUART1->ISR & USART_ISR_TEACK) == 0){}; //wait until the acknowledgement bit is 1
+
+    LPUART1->TDR = ~start_byte; //send anything
     while((LPUART1->ISR & USART_ISR_TC) == 0){} //wait until tc is set to 1 to indicate the end of the transmission
     
     return 0;

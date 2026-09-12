@@ -16,7 +16,7 @@ int main(void){
     RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;
     GPIOA->MODER &= ~GPIO_MODER_MODE5; //mode bits 11 and 10 of PA5, clear both of these bits
     GPIOA->MODER |= GPIO_MODER_MODE5_0; //set the mode bits to 01
-    GPIOA->MODER &= ~GPIO_MODER_MODE8; //mode bits 11 and 10 of PA5, clear both of these bits
+    GPIOA->MODER &= ~GPIO_MODER_MODE8; //mode bits 11 and 10 of PA8, clear both of these bits
     GPIOA->MODER |= GPIO_MODER_MODE8_0; //set the mode bits to 01
 
     while(1){

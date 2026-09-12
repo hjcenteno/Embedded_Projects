@@ -77,7 +77,7 @@ ifeq ($(PROJECT_NAME),)
 endif
 	mkdir -p $(PROJECT_NAME)
 	mkdir -p $(PROJECT_NAME)/src
-	printf '/*\n    author: Henry Centeno\n    description:\n*/\n' > $(PROJECT_NAME)/src/$(PROJECT_NAME).c
+	printf '/*\n    Author: Henry Centeno\n    Description:\n*/\n' > $(PROJECT_NAME)/src/$(PROJECT_NAME).c
 	code $(PROJECT_NAME)/src/$(PROJECT_NAME).c
 
 # Disable make's built-in implicit rules/variables -- same reasoning as
@@ -147,8 +147,9 @@ ifeq ($(NEWLIB_ARG),)
 	$(error Usage: make newlib <name>  e.g. make newlib spi_driver)
 endif
 	mkdir -p $(LIB_DIR)/$(NEWLIB_ARG)
-	printf '/*\n    author: Henry Centeno\n    description:\n*/\n' > $(LIB_DIR)/$(NEWLIB_ARG)/$(NEWLIB_ARG).c
-	printf '/*\n    author: Henry Centeno\n    description:\n*/\n' > $(LIB_DIR)/$(NEWLIB_ARG)/$(NEWLIB_ARG).h
+	printf '/*\n    Author: Henry Centeno\n    Description:\n*/\n' > $(LIB_DIR)/$(NEWLIB_ARG)/$(NEWLIB_ARG).c
+	printf '/*\n    Author: Henry Centeno\n    Description:\n*/\n' > $(LIB_DIR)/$(NEWLIB_ARG)/$(NEWLIB_ARG).h
+	code $(LIB_DIR)/$(NEWLIB_ARG)/$(NEWLIB_ARG).h
 	@echo "created $(LIB_DIR)/$(NEWLIB_ARG)/$(NEWLIB_ARG).c and $(LIB_DIR)/$(NEWLIB_ARG)/$(NEWLIB_ARG).h"
 endif
 
@@ -172,17 +173,31 @@ all: $(addprefix $(BIN_DIR)/,$(addsuffix .elf,$(PROGRAMS)))
 
 COMMON_OBJS := $(OBJ_DIR)/startup_stm32g474xx.o $(OBJ_DIR)/system_stm32g4xx.o
 
-# Shared driver code in ../lib/<driver>/*.c -- compiled and linked into
-# every project. Unused code is stripped at link time by --gc-sections,
-# so projects that don't call a driver don't pay for it in flash.
-LIB_SRCS := $(wildcard $(LIB_DIR)/*/*.c)
-LIB_OBJS := $(patsubst $(LIB_DIR)/%.c,$(OBJ_DIR)/lib/%.o,$(LIB_SRCS))
+# NOTE: driver code under ../lib/<driver>/*.c is now scanned and linked
+# per-program (see USED_LIBS_$(1)/LIB_OBJS_$(1) inside PROGRAM_template
+# below) instead of globbing and compiling every lib/*/*.c for every
+# project. That old global approach meant an unrelated/half-finished
+# driver anywhere in ../lib could break every project's build, since
+# --gc-sections only strips unused code at link time -- it can't save
+# you from a driver that fails to *compile* in the first place.
 
 define PROGRAM_template
 HDRS_$(1) := $$(shell $(CC) $(CFLAGS) -MM $(SRC_DIR)/$(1).c 2>/dev/null \
                | tr -d '\\' | tr ' ' '\n' \
                | grep -E '^$(HDR_DIR)/.*\.h$$$$')
-OBJS_$(1) := $(OBJ_DIR)/$(1).o $$(patsubst $(HDR_DIR)/%.h,$(OBJ_DIR)/headers/%.o,$$(HDRS_$(1))) $(LIB_OBJS) $(COMMON_OBJS)
+
+# Scan the program's own source + its local headers for subfolder-qualified
+# includes like #include "i2c_driver/i2c_driver.h", and only compile/link
+# the lib directories actually referenced -- unused libs are neither
+# compiled nor linked for this program, so a broken/unrelated driver
+# elsewhere in ../lib can't break this build.
+USED_LIBS_$(1) := $$(sort $$(filter $$(notdir $$(wildcard $(LIB_DIR)/*)), \
+    $$(shell grep -ohE '#include *"[A-Za-z0-9_]+/' $(SRC_DIR)/$(1).c $$(HDRS_$(1)) 2>/dev/null \
+        | sed -E 's/#include *"//; s#/##')))
+
+LIB_OBJS_$(1) := $$(foreach l,$$(USED_LIBS_$(1)),$$(patsubst $(LIB_DIR)/%.c,$(OBJ_DIR)/lib/%.o,$$(wildcard $(LIB_DIR)/$$(l)/*.c)))
+
+OBJS_$(1) := $(OBJ_DIR)/$(1).o $$(patsubst $(HDR_DIR)/%.h,$(OBJ_DIR)/headers/%.o,$$(HDRS_$(1))) $$(LIB_OBJS_$(1)) $(COMMON_OBJS)
 
 $(BIN_DIR)/$(1).elf: $$(OBJS_$(1)) $(LINKER_SCRIPT) | $(BIN_DIR)
 	$(CC) $(MCU) -T$(LINKER_SCRIPT) -Wl,--gc-sections -Wl,-Map=$(BIN_DIR)/$(1).map -nostartfiles $$(filter-out $(LINKER_SCRIPT),$$^) -o $$@
