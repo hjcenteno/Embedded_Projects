@@ -10,6 +10,7 @@
 #include "common_includes/common_includes.h"
 
 #define PRESCALAR_VALUE_16MHZ 15 //The counter clock frequency tim_cnt_ck is equal to ftim_psc_ck / (PSC[15:0] + 1)
+#define PRESCALAR_VALUE_24MHZ 23 //The counter clock frequency tim_cnt_ck is equal to ftim_psc_ck / (PSC[15:0] + 1)
 #define MAX_TIME 0xFFFFFFFF
 #define MILLI_TO_MICRO 1000 //to convert between milli (10^-3) and micro (10^-6)
 #define MILLI_TO_BASE 1000 //to convert between milli (10^-3) and base (10^0)
