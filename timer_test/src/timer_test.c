@@ -27,11 +27,11 @@ int main(void){
         //turn the ld2 on for 3 seconds
         GPIOA->BSRR = GPIO_BSRR_BS5;
         client_transmit((uint8_t *)onMsg, 12); //transmit the raw string
-        delay_s(3);
+        delay_s(1);
         //turn the ld2 off for 3 seconds
         GPIOA->BSRR = GPIO_BSRR_BR5;
-        delay_s(3);
         client_transmit((uint8_t *)offMsg, 13); //transmit the raw string
+        delay_s(1);
     }
 
     return 0;
