@@ -17,6 +17,7 @@
 #define MICRO_TO_BASE 1000000 //to convert between base (10^0) and micro (10^-6)
 
 void init_tim2(void); //sets up tim2 to act as the system clock for the mcu
+void init_tim2_ch2_input(uint32_t priority); //set_up tim2_ch2
 uint32_t getTime(void); //gets the value of the cnt register of tim2
 
 //delay is done in microseconds, so when adding new delay functions, convert the time to microseconds)
