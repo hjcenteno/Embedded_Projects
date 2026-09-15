@@ -20,6 +20,7 @@
 #include "system_time/mcu_time.h"
 #include "uart_driver/lpuart_driver.h"
 
+//volatile incase of mishandling of the registers in tim2
 volatile uint32_t echoRisingEdge = 0;
 volatile uint32_t echoFallingEdge = 0;
 volatile bool echoRecorded = false;
@@ -87,6 +88,7 @@ float getDistance(void){
     return distance;
 }
 
+//override of the declaration in the start_stm32_g474xx.s
 void TIM2_IRQHandler(void){
     //tim2 read a rising/falling edge
     if(TIM2->SR & TIM_SR_CC2IF){ //check for CC2IF
