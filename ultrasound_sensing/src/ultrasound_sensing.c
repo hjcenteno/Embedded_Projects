@@ -23,7 +23,6 @@
 //volatile incase of mishandling of the registers in tim2
 volatile uint32_t echoRisingEdge = 0;
 volatile uint32_t echoFallingEdge = 0;
-volatile bool echoRecorded = false;
 
 void init_leds(void){
     //initiates the necessary gpio pins to gp output
@@ -81,8 +80,9 @@ float getDistance(void){
 
     float distance = 0;
     
-    if(echoRecorded == true){
+    if((echoFallingEdge - echoRisingEdge) > 0){
         distance = (float)(echoFallingEdge - echoRisingEdge) / 148;
+
     }
 
     return distance;
@@ -96,7 +96,6 @@ void TIM2_IRQHandler(void){
         if(GPIOB->IDR & GPIO_IDR_ID3){
             echoRisingEdge = TIM2->CCR2; //get the count on the rising edge
         }else{
-            echoRecorded = true;
             echoFallingEdge = TIM2->CCR2; //get the count on the falling edge
         }
     }
@@ -106,7 +105,7 @@ void TIM2_IRQHandler(void){
 }
 
 int main(void){
-    // init_lpuart();
+    init_lpuart();
     init_tim2();
     init_components();
 
@@ -119,7 +118,7 @@ int main(void){
         trigger_HCSR04(); //trigger the trig line high
 
         //capture the duration of echo signal
-        float distance = getDistance(); 
+        float distance = getDistance();
 
         GPIOB->BSRR = GPIO_BSRR_BR6;
         GPIOA->BSRR = GPIO_BSRR_BR7;
@@ -127,18 +126,21 @@ int main(void){
 
         //turn on the depending on the distance
         if((distance > MAXIMUM_LED2_THRESHOLD) && (distance  <= MAXIMUM_LED3_THRESHOLD)){
-            //turn on led 3
-            GPIOB->BSRR = GPIO_BSRR_BS6;
+            //turn on led 3, leave the others off
+            GPIOB->BSRR = GPIO_BSRR_BS6; //led 3
+            client_transmit((uint8_t *)&distance, sizeof(distance));
         }
 
         else if((distance > MAXIMUM_LED1_THRESHOLD) && (distance  <= MAXIMUM_LED2_THRESHOLD)){
             //turn on led 2
-            GPIOA->BSRR = GPIO_BSRR_BS7;
+            GPIOA->BSRR = GPIO_BSRR_BS7; //led 2
+            client_transmit((uint8_t *)&distance, sizeof(distance));
         }
 
         else if((distance > 0) && (distance <= MAXIMUM_LED1_THRESHOLD)){
             //turn on led 1
-            GPIOA->BSRR = GPIO_BSRR_BS6;
+            GPIOA->BSRR = GPIO_BSRR_BS6; //led 1
+            client_transmit((uint8_t *)&distance, sizeof(distance));
         }
     }
 
