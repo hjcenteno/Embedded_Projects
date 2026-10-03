@@ -7,7 +7,7 @@
 
 //todo: change this function to handle channels
 void init_tim2(void){
-    /* set up tim2 at 16 Mhz */
+    /* set up tim2 at 24 Mhz */
 
     //use a 24 MHz HSE
     RCC->CR &= ~RCC_CR_HSEON;
@@ -41,7 +41,7 @@ void init_tim2(void){
     RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW) | RCC_CFGR_SW_1;
     while((RCC->CFGR & RCC_CFGR_SWS_HSE) == 0){} // wait while the status is set
 
-    // //set up apb1 for 16 MHz
+    // //set up apb1 for 24 MHz
     RCC->APB1ENR1 &= ~RCC_APB1ENR1_TIM2EN;
     RCC->APB1ENR1 |= RCC_APB1ENR1_TIM2EN;
 
