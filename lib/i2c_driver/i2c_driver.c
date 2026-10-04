@@ -1,7 +1,8 @@
 /*
     Author: Henry Centeno
     Description:
-        I2C implementation for my stm32 nucleo-g474re.
+        I2C implementation for my stm32 nucleo-g474re. This code is written to use i2c1 on the nucleo g474re, I will at some point
+        add support for i2c 2-4, but at the moment, implementing those is simply not needed.
 */
 
 #include "i2c_driver.h"
