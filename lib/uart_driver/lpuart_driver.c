@@ -62,7 +62,7 @@ int init_lpuart(void){
     LPUART1->BRR = 0x369;
     //going to use 1 stop bit
     LPUART1->CR2 &= ~(USART_CR2_STOP_0 | USART_CR2_STOP_1); //since'00' is defined as 1 stop bit, this clear ensures that the LPUART will use the 1 stop bit
-    //enable the lpuart by writing '1' to the us bit in cr1
+    //enable the lpuart by writing '1' to the ue bit in cr1
     LPUART1->CR1 |= (USART_CR1_UE | USART_CR1_TE); //send the first transmission as well to test if the LPUART is configured
     while((LPUART1->ISR & USART_ISR_TEACK) == 0){}; //wait until the acknowledgement bit is 1
 
