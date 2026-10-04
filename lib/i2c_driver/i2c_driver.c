@@ -41,6 +41,7 @@ static void set_timingr_settings(i2c_mode mode){
             );
         break;
     }
+
 }
 
 /*
@@ -57,12 +58,18 @@ static inline void disable_i2c(void){
 
 void reset_i2c(void){
     //reset the i2c by dsiabling it then wait for it to turn back on
+    //reset flags incase of the errors
+    if(I2C1->ISR & (I2C_ISR_ARLO | I2C_ISR_BERR)){
+        I2C1->ICR = (I2C_ICR_ARLOCF | I2C_ICR_BERRCF);
+    }
+
     I2C1->CR1 &= ~I2C_CR1_PE;
     while(I2C1->CR1 & I2C_CR1_PE){}
     I2C1->CR1 |= I2C_CR1_PE;
+
 }
 
-int init_i2c(i2c_mode mode, bool interruptEN, uint32_t priority){
+int init_i2c(i2c_mode mode){
     //returns 0 on a successful initiation, 1 on failure
 
     //enable the rcc peripheral clock for the i2c and gpiob
@@ -98,19 +105,163 @@ int init_i2c(i2c_mode mode, bool interruptEN, uint32_t priority){
     disable_i2c(); //ensure the i2c is properly reset before configuring
     
     //at the moment, only the analog filter is being used, I will add a function to configure the digital noise filter if I need it
-    I2C1->CR1 &= ~(I2C_CR1_ANFOFF | I2C_CR1_DNF);
+    I2C1->CR1 &= ~(I2C_CR1_ANFOFF | I2C_CR1_DNF | I2C_CR1_SBC);
     
     //keeping the nostretch bit off as the mcu will act as the controller
     set_timingr_settings(mode);
 
-    if(interruptEN){
-        //configure for interrupt, else it'll be fore polling
-        I2C1->CR1 &= ~(I2C_CR1_RXIE | I2C_CR1_TXIE);
-        I2C1->CR1 |= (I2C_CR1_RXIE | I2C_CR1_TXIE); //interrupt on read and write
-        NVIC_SetPriority(I2C1_EV_IRQn, priority);
-        NVIC_EnableIRQ(I2C1_EV_IRQn);
-    }
+    //configuring cr2
+    //configure for 7 bit addressing by leaving the add10 bit as 0
+    I2C1->CR2 &= ~(I2C_CR2_ADD10 | I2C_CR2_AUTOEND | I2C_CR2_RELOAD); //create a clean slate 
 
     I2C1->CR1 |= I2C_CR1_PE;
     return 0;
+}
+
+static int i2c_transmit_addr(uint8_t addr){
+    //writes the addr to the txdr of the i2c
+    while((I2C1->ISR & (I2C_ISR_NACKF | I2C_ISR_TXIS)) == 0){}
+
+    if(I2C1->ISR & I2C_ISR_NACKF){ //end when the nackf == 1
+        return 1;
+    }
+
+    I2C1->TXDR = addr;
+    
+    return 0;
+}
+
+static int i2c_transmit_data(uint8_t *data, uint8_t length){
+    //return 1 on nack, arlo, or berr 
+    for(uint8_t i = 0; i < length; i++){
+        while((I2C1->ISR & (I2C_ISR_NACKF | I2C_ISR_TXIS | I2C_ISR_ARLO | I2C_ISR_BERR)) == 0){} //wait until either the txis or nackf is set to 1
+
+        if(I2C1->ISR & (I2C_ISR_NACKF | I2C_ISR_ARLO | I2C_ISR_BERR)){ //end when the nackf == 1 or an error occured
+            return 1;
+        }
+
+        //write the data
+        I2C1->TXDR = data[i];
+    }
+    
+    return 0;
+}
+
+static int i2c_read_data(uint8_t *data, uint8_t length){
+    //return 1 upon a bus error or arbitration loss
+    for(uint8_t i = 0; i < length; i++){
+        while((I2C1->ISR & (I2C_ISR_ARLO | I2C_ISR_BERR | I2C_ISR_RXNE)) == 0){} //wait until rxne == 1
+    
+        if(I2C1->ISR & (I2C_ISR_ARLO | I2C_ISR_BERR)){
+            return 1;
+        }
+
+        data[i] = I2C1->RXDR;
+    }
+
+    return 0;
+}
+
+static void clean_i2c_cr2(uint8_t saddr, uint8_t nbytes, bool reading, bool autoend){
+    //creating a clean slate for cr2
+    I2C1->CR2 &= ~(
+        I2C_CR2_SADD | I2C_CR2_RD_WRN | I2C_CR2_NBYTES |
+        I2C_CR2_NACK | I2C_CR2_START | I2C_CR2_STOP |
+        I2C_CR2_AUTOEND
+    );
+
+    //reading is set when the rd_wrn bit is set, otherwise 0 is writing
+    if(reading){
+        I2C1->CR2 |= I2C_CR2_RD_WRN;
+    }
+
+    if(autoend){
+        I2C1->CR2 |= I2C_CR2_AUTOEND;
+    }
+
+    I2C1->CR2 |= ((saddr << 1) << I2C_CR2_SADD_Pos); //set the saddr leftshifted by 1 since sadd[0] is don't care for 7-bit addressing
+    
+    I2C1->CR2 |= (nbytes << I2C_CR2_NBYTES_Pos); //number of bytes to be transmitted
+}
+
+int i2c_master_write(uint8_t saddr, uint8_t regaddr, uint8_t *data, uint8_t dLength){
+    int result = 0;
+    
+    if((I2C1->CR1 & I2C_CR1_PE) == 0){
+        return 1; //return if the i2c is not configured
+    }
+
+    if(((data == NULL) || dLength == 0) || (dLength > 254)){
+        return 1; //check the parameters, and return on invalid parameters
+    }
+
+    //only transmit if communication is not being processed
+    while(I2C1->ISR & I2C_ISR_BUSY){}
+    
+    //creating a clean slate for cr2
+    clean_i2c_cr2(saddr, (dLength + 1), false, true); //controller will automatically send a stop condition once nbytes are sent
+
+    //begin transmission, following figure 551 for 12c controller transmitter for nbytes <= 255
+    I2C1->CR2 |= I2C_CR2_START;
+
+    //send the register address
+    result = i2c_transmit_addr(regaddr);
+    
+    if(result == 0){
+        result = i2c_transmit_data(data, dLength);
+    }
+    
+    //wait until the transmission ends clear with the icr
+    while((I2C1->ISR & I2C_ISR_STOPF) == 0){}
+    I2C1->ICR = (I2C_ICR_STOPCF | I2C_ICR_NACKCF);
+
+    return result;
+}
+
+int i2c_master_read(uint8_t saddr, uint8_t regaddr, uint8_t *data, uint8_t dLength){
+    int result = 0;
+
+    if((I2C1->CR1 & I2C_CR1_PE) == 0){
+        return 1; //return if the i2c is not configured
+    }
+
+    if(((data == NULL) || dLength == 0)){
+        return 1; //check the parameters, and return on invalid parameters
+    }
+
+    //only read if communication is not being processed
+    while(I2C1->ISR & I2C_ISR_BUSY){}
+
+    //following figure 554 of the reference manual for controller receiver, n <= 255
+    //reading is split into first transmitting the register address, then reading
+    //per table 357 row 2, reading needs autoend to be 0
+    clean_i2c_cr2(saddr, 1, false, false);
+
+    I2C1->CR2 |= I2C_CR2_START;
+    
+    result = i2c_transmit_addr(regaddr);
+    if(result == 0){
+        while((I2C1->ISR & (I2C_ISR_NACKF | I2C_ISR_TC)) == 0){} //wait until either the txis or nackf is set to 1
+        if(I2C1->ISR & I2C_ISR_NACKF){ //end when the nackf == 1
+            result = 1; //failed to send the register address
+        }
+    }
+
+    //read from the register
+    if(result == 0){
+        clean_i2c_cr2(saddr, dLength, true, true);
+        I2C1->CR2 |= I2C_CR2_START;
+        result = i2c_read_data(data, dLength);
+    }
+
+    if(result == 1){
+        reset_i2c();
+        return 1;
+    }
+
+    //wait until the transmission ends clear with the icr
+    while((I2C1->ISR & I2C_ISR_STOPF) == 0){}
+    I2C1->ICR = (I2C_ICR_STOPCF | I2C_ICR_NACKCF);
+
+    return result;
 }
