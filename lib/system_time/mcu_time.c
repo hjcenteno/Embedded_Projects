@@ -1,6 +1,11 @@
 /*
     Author: Henry Centeno
-    Description: Sets up a general purpose timer
+    version 1.0.0
+    Description: Sets up a general purpose timer.
+
+    notes:
+    *I plan to in the future to add multi channel and multi tim support,
+    but at the moment those features are not needed.
 */
 
 #include "mcu_time.h"
@@ -106,7 +111,13 @@ uint32_t getTime(void){
 }
 
 void delay_us(uint32_t microseconds){
-    //amount of time to delay in microseconds
+    //amount of time to delay in microseconds (max of 2^32 -1 microseconds)
+    /*
+        max amount is simply because a uint32_t can only store a maximum of 2^32 - 1
+    */
+    if(microseconds > MAX_TIME){
+        microseconds = MAX_TIME;
+    }
     uint32_t startTime = getTime();
     uint32_t currentTime = startTime;
 
@@ -118,13 +129,24 @@ void delay_us(uint32_t microseconds){
 
 //delay is done in microseconds, so when adding new delay functions, convert the time to microseconds)
 void delay_ms(uint32_t milliseconds){
-    //amount of time to delay in milliseconds
+    //amount of time to delay in milliseconds (max 4294 milliseconds)
+    //the max amount comes from (2^32 -1) / 1000
+    if(milliseconds > 4294){
+        milliseconds = 4294; //capped at 4294
+    }
+
+
     uint32_t delay = milliseconds * MILLI_TO_MICRO;
     delay_us(delay);
 } 
 
 void delay_s(uint32_t seconds){
-    //amount of time to delay in seconds
+    //amount of time to delay in seconds (max one hour)
+    //the max of one hour is because 2^32 - 1 microseconds is roughly 1.2 hours
+    if(seconds > 60){
+        seconds = 60; //capped at 60 seconds since 60 seconds is one hour
+    }
+
     uint32_t delay = seconds * MICRO_TO_BASE;
     delay_us(delay);
 } 
