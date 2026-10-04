@@ -10,5 +10,6 @@
 #include "stm32g474xx.h"
 #include <inttypes.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 #endif
