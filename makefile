@@ -18,6 +18,7 @@ OBJ_DIR       := $(BIN_DIR)/obj
 LIB_DIR       := ../lib
 
 CFLAGS   := $(MCU) -Wall -Wextra -g3 -gdwarf-4 -O0 -std=gnu11 -DSTM32G474xx \
+			-ffunction-sections -fdata-sections \
             -I$(HDR_DIR) \
             -I$(LIB_DIR) \
             -I$(CMSIS_CORE)/CMSIS/Core/Include \
