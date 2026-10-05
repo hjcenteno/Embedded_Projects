@@ -105,20 +105,28 @@ jobs:
             exit 1
           fi
           HDR_INCLUDES=$(find . -type d -path '*/src/headers' | sed 's/^/-I/')
+          # The -D__ARM_* macros are the ones arm-none-eabi-gcc predefines for
+          # this CPU (see: arm-none-eabi-gcc -mcpu=cortex-m4 -dM -E - </dev/null).
+          # cppcheck doesn't know them, and without __ARM_ARCH_PROFILE (77 = 'M')
+          # cmsis_gcc.h hits '#error "Unknown Arm architecture profile"', which
+          # makes cppcheck silently skip every file that includes CMSIS.
+          # Findings inside the vendor CMSIS headers are suppressed wholesale.
           cppcheck \
             --enable=warning,style,performance,portability \
             --std=c11 \
             --max-configs=1 \
             -D__GNUC__ \
             -D__ARM_ARCH_7EM__=1 \
+            -D__ARM_ARCH_PROFILE=77 \
+            -D__ARM_ARCH=7 \
+            -D__ARM_FP=4 \
+            -D__ARM_FEATURE_DSP=1 \
             -DSTM32G474xx \
             -j$(nproc) \
             --suppress=missingIncludeSystem \
             --suppress=toomanyconfigs \
-            --suppress=constVariablePointer:*/cmsis_core/* \
-            --suppress=constVariablePointer:*/cmsis_device_g4/* \
-            --suppress=preprocessorErrorDirective:*/cmsis_core/* \
-            --suppress=preprocessorErrorDirective:*/cmsis_device_g4/* \
+            --suppress='*:*/cmsis_core/*' \
+            --suppress='*:*/cmsis_device_g4/*' \
             -I "$HOME/cmsis_core/CMSIS/Core/Include" \
             -I "$HOME/cmsis_device_g4/Include" \
             -I lib \
