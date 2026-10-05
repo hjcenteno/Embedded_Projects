@@ -96,6 +96,11 @@ jobs:
       # `if: !cancelled()` on each analyzer: run it even if an earlier analyzer
       # failed, so one run reports findings from all three tools. The job is
       # still marked failed if any of them fails.
+      #
+      # cppcheck findings become GitHub annotations: severity error/warning
+      # (likely bugs) -> red ::error that fails the step; style/performance/
+      # portability (suggestions) -> yellow ::warning that is reported but
+      # does not fail the build.
       - name: cppcheck
         if: ${{ !cancelled() }}
         run: |
@@ -123,6 +128,7 @@ jobs:
             -D__ARM_FEATURE_DSP=1 \
             -DSTM32G474xx \
             -j$(nproc) \
+            --quiet \
             --suppress=missingIncludeSystem \
             --suppress=toomanyconfigs \
             --suppress='*:*/cmsis_core/*' \
@@ -131,12 +137,17 @@ jobs:
             -I "$HOME/cmsis_device_g4/Include" \
             -I lib \
             $HDR_INCLUDES \
-            --error-exitcode=1 \
-            $FILES
+            --template='{severity}|{file}|{line}|{column}|{id}|{message}' \
+            $FILES 2> cppcheck-results.txt
+          awk -F'|' '
+            NF >= 6 {
+              msg = $6; for (i = 7; i <= NF; i++) msg = msg "|" $i
+              level = ($1 == "error" || $1 == "warning") ? "error" : "warning"
+              if (level == "error") fail = 1
+              printf "::%s file=%s,line=%s,col=%s,title=cppcheck %s::%s\n", level, $2, $3, $4, $5, msg
+            }
+            END { exit fail }' cppcheck-results.txt
 
-      # Every file is analyzed even if an earlier one fails: failures are
-      # collected in $status and reported once at the end, instead of bash -e
-      # stopping the loop at the first error.
       # --warnings-as-errors: clang-tidy reports its findings as warnings, which
       # would not fail the step on their own. Warnings inside CMSIS headers are
       # suppressed as non-user code, so they never trigger this.
