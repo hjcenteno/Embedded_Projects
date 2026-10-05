@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [DEV]
+    # CI_check is a temporary branch for verifying the analyzers catch bugs;
+    # remove it from this list (or just delete the branch) once CI is confirmed.
+    branches: [DEV, CI_check]
     paths:
       - '**.c'
       - '**.h'
@@ -21,6 +23,8 @@ on:
       - 'linker/**'
       - 'startup/**'
       - '.github/workflows/ci.yml'
+  # Adds a "Run workflow" button in the Actions tab to run CI on any branch.
+  workflow_dispatch:
 
 # Cancel superseded runs, but key by event name too so a push-triggered run
 # and a pull_request-triggered run never cancel each other -- branch
@@ -55,6 +59,30 @@ jobs:
       - name: Set up environment (CMSIS, startup, linker)
         run: cmake -P bootstrap.cmake
 
+      # Ask arm-none-eabi-gcc where its C library (newlib) headers live and
+      # export them as -idirafter flags for the clang-based tools below.
+      # -idirafter (not -I) places them AFTER clang's own builtin headers, so
+      # clang's wrapper headers (inttypes.h, stdint.h, ...) can reach newlib's
+      # versions through #include_next.
+      # GCC reports newlib's dir as .../lib/gcc/arm-none-eabi/<ver>/../../../arm-none-eabi/include,
+      # so each path is canonicalized with readlink -f BEFORE filtering out
+      # GCC's private /lib/gcc/ dirs (clang supplies its own equivalents).
+      # Filtering the raw paths would discard newlib's dir as well.
+      - name: Discover newlib include paths
+        run: |
+          GCC_IDIRAFTER=$(echo | arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -E -Wp,-v -xc - 2>&1 \
+            | sed -n '/search starts here/,/End of search/p' | grep '^ ' \
+            | sed 's/^ //' \
+            | while read -r p; do readlink -f "$p"; done \
+            | grep -v '/lib/gcc/' \
+            | sed 's/^/-idirafter /' | tr '\n' ' ')
+          if [ -z "$GCC_IDIRAFTER" ]; then
+            echo "Could not determine arm-none-eabi-gcc include paths."
+            exit 1
+          fi
+          echo "Found: $GCC_IDIRAFTER"
+          echo "GCC_IDIRAFTER=$GCC_IDIRAFTER" >> "$GITHUB_ENV"
+
       - name: Build every project
         run: |
           for d in */; do
@@ -65,7 +93,11 @@ jobs:
             fi
           done
 
+      # `if: !cancelled()` on each analyzer: run it even if an earlier analyzer
+      # failed, so one run reports findings from all three tools. The job is
+      # still marked failed if any of them fails.
       - name: cppcheck
+        if: ${{ !cancelled() }}
         run: |
           FILES=$(find . -path '*/src/*.c' -o -path './lib/*/*.c')
           if [ -z "$FILES" ]; then
@@ -94,27 +126,50 @@ jobs:
             --error-exitcode=1 \
             $FILES
 
+      # Every file is analyzed even if an earlier one fails: failures are
+      # collected in $status and reported once at the end, instead of bash -e
+      # stopping the loop at the first error.
+      # --warnings-as-errors: clang-tidy reports its findings as warnings, which
+      # would not fail the step on their own. Warnings inside CMSIS headers are
+      # suppressed as non-user code, so they never trigger this.
+      # bugprone-easily-swappable-parameters is disabled: it flags every
+      # function with two adjacent same-type parameters (e.g. saddr, regaddr),
+      # which is a style heuristic rather than a bug.
       - name: clang-tidy
-        continue-on-error: true
+        if: ${{ !cancelled() }}
         run: |
-          GCC_INCLUDES=$(echo | arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -E -Wp,-v -xc - 2>&1 \
-            | sed -n '/search starts here/,/End of search/p' | grep '^ ' \
-            | grep -v '/lib/gcc/' \
-            | sed 's/^ /-I/')
           FILES=$(find . -path '*/src/*.c' -o -path './lib/*/*.c')
           HDR_INCLUDES=$(find . -type d -path '*/src/headers' | sed 's/^/-I/')
+          status=0
           for f in $FILES; do
+            echo "== clang-tidy $f =="
             clang-tidy "$f" \
-              --checks='bugprone-*,clang-analyzer-*,cert-*' \
+              --checks='bugprone-*,-bugprone-easily-swappable-parameters,clang-analyzer-*,cert-*' \
+              --warnings-as-errors='*' \
               -- -I"$HOME/cmsis_core/CMSIS/Core/Include" \
                  -I"$HOME/cmsis_device_g4/Include" \
                  -Ilib \
                  $HDR_INCLUDES \
-                 $GCC_INCLUDES \
-                 -DSTM32G474xx --target=arm-none-eabi -mcpu=cortex-m4 -mthumb
+                 $GCC_IDIRAFTER \
+                 -DSTM32G474xx --target=arm-none-eabi \
+                 -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard \
+              || status=1
           done
+          exit $status
 
+      # make -B forces a full rebuild: the "Build every project" step already
+      # left every object up to date, and scan-build can only analyze files
+      # that are actually compiled while it is watching.
+      # scan-build hooks in by setting the CC environment variable to its
+      # wrapper (ccc-analyzer), but the makefile's `CC := arm-none-eabi-gcc`
+      # overrides environment variables. Passing CC="$CC" on make's command
+      # line (via sh -c, so $CC is scan-build's value) takes priority over
+      # the makefile. The wrapper still compiles with arm-none-eabi-gcc
+      # (--use-cc) and additionally runs the analyzer on each file.
+      # EXTRA_CFLAGS gives the analyzer (clang) the newlib include paths; it
+      # only takes effect once the makefile has `CFLAGS += $(EXTRA_CFLAGS)`.
       - name: Run scan-build across every project
+        if: ${{ !cancelled() }}
         run: |
           SCAN_BUILD=$(command -v scan-build || find /usr/lib/llvm-*/bin /usr/bin -maxdepth 1 -name 'scan-build*' 2>/dev/null | sort -V | tail -1)
           if [ -z "$SCAN_BUILD" ]; then
@@ -122,12 +177,28 @@ jobs:
             exit 1
           fi
           echo "Using $SCAN_BUILD"
-          export CCC_CC=arm-none-eabi-gcc
-          export CLANG_ANALYZER_TARGET=arm-none-eabi
+          status=0
           for d in */; do
             d=${d%/}
             if ls "$d"/src/*.c >/dev/null 2>&1; then
               echo "== Analyzing $d =="
-              "$SCAN_BUILD" --status-bugs make -C "$d" -f "$PWD/makefile" "$d"
+              "$SCAN_BUILD" --status-bugs \
+                --use-cc=arm-none-eabi-gcc \
+                --analyzer-target=arm-none-eabi \
+                -o "$PWD/scan-reports/$d" \
+                sh -c 'make -B -C "$1" -f "$2/makefile" "$1" CC="$CC" EXTRA_CFLAGS="$GCC_IDIRAFTER"' \
+                  _ "$d" "$PWD" \
+                || status=1
             fi
           done
+          exit $status
+
+      # If scan-build found bugs, keep its HTML reports so they can be
+      # downloaded from the run's summary page.
+      - name: Upload scan-build reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-build-reports
+          path: scan-reports/
+          if-no-files-found: ignore
