@@ -79,7 +79,7 @@ int init_lpuart(void){
     is set. This flag remains set until the TXFIFO is full.
 */
 
-void client_byte_transmit(uint8_t data){
+void client_byte_transmit(const uint8_t data){
     /* MCU transmit one byte */
 
     //early return if the lpuart is not enabled
@@ -99,7 +99,7 @@ void client_byte_transmit(uint8_t data){
 
 }
 
-void client_transmit(uint8_t *data, const uint8_t length){
+void client_transmit(const uint8_t *data, const uint8_t length){
     /* 
         MCU transmits N (length) bytes. It is important that the server should know how to interpret the bytes
         as this function only sends raw bytes.
