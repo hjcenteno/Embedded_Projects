@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install toolchain (no-recommends -- skips an unneeded 463MB C++ package)
         run: |
@@ -49,7 +49,7 @@ jobs:
             cppcheck clang-tidy clang clang-tools cmake
 
       - name: Cache CMSIS
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/cmsis_core
@@ -205,7 +205,7 @@ jobs:
       # downloaded from the run's summary page.
       - name: Upload scan-build reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: scan-build-reports
           path: scan-reports/

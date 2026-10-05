@@ -31,9 +31,9 @@ void reset_i2c(void); //reset the i2c
 */
 
 int i2c_master_read(uint8_t saddr, uint8_t regaddr, uint8_t *data, uint8_t dLength);
-int i2c_master_write(uint8_t saddr, uint8_t regaddr, uint8_t *data, uint8_t dLength);
+int i2c_master_write(uint8_t saddr, uint8_t regaddr, const uint8_t *data, uint8_t dLength);
 
 int i2c_slave_read(uint8_t maddr, uint8_t saddr, uint8_t regaddr, uint8_t data);
-int i2c_slave_write(uint8_t maddr, uint8_t saddr, uint8_t regaddr, uint8_t data);
+int i2c_slave_write(uint8_t maddr, uint8_t saddr, uint8_t regaddr, const uint8_t data);
 
 #endif
