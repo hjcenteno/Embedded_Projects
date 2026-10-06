@@ -90,8 +90,8 @@ void init_tim2_ch2_input(uint32_t priority){
     //allow for interrupts
     TIM2->DIER &= ~(TIM_DIER_CC2IE);
     TIM2->DIER |= TIM_DIER_CC2IE;
-    NVIC_EnableIRQ(TIM2_IRQn);
     NVIC_SetPriority(TIM2_IRQn, priority); //set the priority for the interrupt
+    NVIC_EnableIRQ(TIM2_IRQn);
     
     //enable the tim
     enable_time2();

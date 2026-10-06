@@ -34,10 +34,11 @@ This will setup everything the makefile expects and installs:
 Embedded_Projects Makefile -- available targets
 -  `make <project>` to build a project
 -  `make flash-<project>` to flash it
+-  `make disarm-<project>` to to view the assembly generated.
 -  `make clean [proj ...]` to remove the bin directory for the named projects. If no project was given, will remove each bin directory in all the project directories.
 -  `make list` list out every project
 -  `make project <name>` create a new project dir
--  `make lib <name>` compile the given lib source file for a syntax check, does not link
--  `make newlib <name>` create a new lib directory for thesource and header files
+-  `make lib <name>|<dir>/<name>` compile the given lib source file for a syntax check, does not link
+-  `make newlib <name>|<dir>/<name>` create a new lib directory for the source and header files (or add to an existing one directory)
 -  `make listlib` list every library available under the lib directory
 -  `make HELP` shows what the make file can do
