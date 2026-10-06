@@ -32,9 +32,9 @@ return 0 on success
 int init_lpuart(void);
 
 //tx, rx for the client and server
-void client_transmit(uint8_t *data, const uint8_t length); //transmits to the server's rx
+void client_transmit(const uint8_t *data, const uint8_t length); //transmits to the server's rx
 void client_byte_transmit(uint8_t data);
-void server_transmit(uint8_t *data, const uint8_t length); //transmits to the client's rx
+void server_transmit(const uint8_t *data, const uint8_t length); //transmits to the client's rx
 void server_byte_transmit(uint8_t data);
 
 //returns the number of bytes read

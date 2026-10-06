@@ -23,6 +23,7 @@ CFLAGS   := $(MCU) -Wall -Wextra -g3 -gdwarf-4 -O0 -std=gnu11 -DSTM32G474xx \
             -I$(LIB_DIR) \
             -I$(CMSIS_CORE)/CMSIS/Core/Include \
             -I$(CMSIS_DEVICE)/Include
+CFLAGS += $(EXTRA_CFLAGS)
 DEPFLAGS := -MMD -MP
 
 PROGRAMS := $(basename $(notdir $(wildcard $(SRC_DIR)/*.c)))
