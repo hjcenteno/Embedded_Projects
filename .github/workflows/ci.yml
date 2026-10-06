@@ -4,7 +4,7 @@ on:
   push:
     # CI_check is a temporary branch for verifying the analyzers catch bugs;
     # remove it from this list (or just delete the branch) once CI is confirmed.
-    branches: [DEV, CI_check]
+    branches: [DEV]
     paths:
       - '**.c'
       - '**.h'
