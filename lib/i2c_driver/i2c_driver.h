@@ -21,8 +21,7 @@ typedef enum i2c_mode{
     of the interrupts in cr1.
 */
 int init_i2c(i2c_mode mode);
-static inline void disable_i2c(void); //handles the i2c reset, called at the end
-void reset_i2c(void);
+void reset_i2c(void); //reset the i2c
 /*
     uint8_t maddr: master address
     uint8_t saddr: slave address
@@ -32,9 +31,9 @@ void reset_i2c(void);
 */
 
 int i2c_master_read(uint8_t saddr, uint8_t regaddr, uint8_t *data, uint8_t dLength);
-int i2c_master_write(uint8_t saddr, uint8_t regaddr, uint8_t *data, uint8_t dLength);
+int i2c_master_write(uint8_t saddr, uint8_t regaddr, const uint8_t *data, uint8_t dLength);
 
 int i2c_slave_read(uint8_t maddr, uint8_t saddr, uint8_t regaddr, uint8_t data);
-int i2c_slave_write(uint8_t maddr, uint8_t saddr, uint8_t regaddr, uint8_t data);
+int i2c_slave_write(uint8_t maddr, uint8_t saddr, uint8_t regaddr, const uint8_t data);
 
 #endif

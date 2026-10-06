@@ -131,7 +131,7 @@ static int i2c_transmit_addr(uint8_t addr){
     return 0;
 }
 
-static int i2c_transmit_data(uint8_t *data, uint8_t length){
+static int i2c_transmit_data(const uint8_t *data, uint8_t length){
     //return 1 on nack, arlo, or berr 
     for(uint8_t i = 0; i < length; i++){
         while((I2C1->ISR & (I2C_ISR_NACKF | I2C_ISR_TXIS | I2C_ISR_ARLO | I2C_ISR_BERR)) == 0){} //wait until either the txis or nackf is set to 1
@@ -184,7 +184,7 @@ static void clean_i2c_cr2(uint8_t saddr, uint8_t nbytes, bool reading, bool auto
     I2C1->CR2 |= (nbytes << I2C_CR2_NBYTES_Pos); //number of bytes to be transmitted
 }
 
-int i2c_master_write(uint8_t saddr, uint8_t regaddr, uint8_t *data, uint8_t dLength){
+int i2c_master_write(uint8_t saddr, uint8_t regaddr, const uint8_t *data, uint8_t dLength){
     int result = 0;
     
     if((I2C1->CR1 & I2C_CR1_PE) == 0){
