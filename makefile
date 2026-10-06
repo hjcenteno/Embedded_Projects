@@ -26,6 +26,8 @@ CFLAGS   := $(MCU) -Wall -Wextra -g3 -gdwarf-4 -O0 -std=gnu11 -DSTM32G474xx \
 CFLAGS += $(EXTRA_CFLAGS)
 DEPFLAGS := -MMD -MP
 
+OBJDUMP  := arm-none-eabi-objdump
+
 PROGRAMS := $(basename $(notdir $(wildcard $(SRC_DIR)/*.c)))
 
 # Top-level project dispatch: lets you run `make <project>` /
@@ -43,6 +45,9 @@ $(1):
 
 flash-$(1):
 	$$(MAKE) -C $(1) -f $$(MAKEFILE_PATH) flash-$(1)
+
+disarm-$(1):
+	$$(MAKE) -C $(1) -f $$(MAKEFILE_PATH) disarm-$(1)
 
 clean-$(1):
 	$$(MAKE) -C $(1) -f $$(MAKEFILE_PATH) clean
@@ -92,7 +97,8 @@ MAKEFLAGS += -r -R --no-print-directory
 # `make lib <name>`: compile a single lib/*/<name>.c file without linking --
 # a fast syntax/compile check for one driver file. <name> can be given as
 # "lpuart_driver", "lpuart_driver.c", or "uart_driver/lpuart_driver.c".
-# `make newlib <name>` scaffolds a brand new lib/<name>/ directory instead.
+# `make newlib <name>` scaffolds a brand new lib/<name>/ directory, and
+# `make newlib <dir>/<name>` adds <name>.c/.h to lib/<dir>/ (new or existing).
 # `make listlib` enumerates every buildable library (see further down).
 # Works from the top level (Embedded_Projects/) or from inside a project
 # dir. Extra word after "lib"/"newlib" is the file name, not a build
@@ -118,41 +124,59 @@ ifneq ($(PROJECTS),)
 # of them and the relative path (../lib) is identical from any project.
 lib:
 ifeq ($(LIB_ARG),)
-	$(error Usage: make lib <name>  e.g. make lib lpuart_driver)
+	$(error Usage: make lib <name>  e.g. make lib lpuart_driver or make lib sensors/mpu6050_driver)
 endif
 	@$(MAKE) -C $(firstword $(PROJECTS)) -f $(MAKEFILE_PATH) lib $(LIB_ARG)
 
 newlib:
 ifeq ($(NEWLIB_ARG),)
-	$(error Usage: make newlib <name>  e.g. make newlib spi_driver)
+	$(error Usage: make newlib <name> or make newlib <dir>/<name>  e.g. make newlib sensors/mpu6050_driver)
 endif
 	@$(MAKE) -C $(firstword $(PROJECTS)) -f $(MAKEFILE_PATH) newlib $(NEWLIB_ARG)
 else
 # nested (inside a project dir): resolve the file and compile it via the
 # existing $(OBJ_DIR)/lib/%.o pattern rule -- no duplicated compile logic.
+# Accepts "name" (searched in every lib/*/) or "dir/name" (exact path).
 LIB_REL := $(basename $(LIB_ARG))
 ifeq ($(findstring /,$(LIB_REL)),)
 LIB_REL := $(patsubst $(LIB_DIR)/%.c,%,$(firstword $(wildcard $(LIB_DIR)/*/$(LIB_REL).c)))
+else
+LIB_REL := $(if $(wildcard $(LIB_DIR)/$(LIB_REL).c),$(LIB_REL))
 endif
 
 lib: $(if $(LIB_REL),$(OBJ_DIR)/lib/$(LIB_REL).o)
 ifeq ($(LIB_ARG),)
-	$(error Usage: make lib <name>  e.g. make lib lpuart_driver)
+	$(error Usage: make lib <name>  e.g. make lib lpuart_driver or make lib sensors/mpu6050_driver)
 endif
 ifeq ($(LIB_REL),)
-	$(error No source file found matching '$(LIB_ARG).c' under $(LIB_DIR)/*/ -- use make newlib $(LIB_ARG) to create one)
+	$(error No source file found matching '$(LIB_ARG)' under $(LIB_DIR)/ -- use make newlib $(basename $(LIB_ARG)) to create it)
 endif
 	@echo "compiled $(LIB_DIR)/$(LIB_REL).c -> $(OBJ_DIR)/lib/$(LIB_REL).o"
 
+# `make newlib spi_driver`             -> lib/spi_driver/spi_driver.{c,h}
+# `make newlib sensors/mpu6050_driver` -> lib/sensors/mpu6050_driver.{c,h}
+# Existing files are never overwritten, so adding a file to an existing
+# library directory is safe.
+NEWLIB_NAME := $(basename $(NEWLIB_ARG))
+ifeq ($(findstring /,$(NEWLIB_NAME)),)
+NEWLIB_DIR  := $(NEWLIB_NAME)
+NEWLIB_FILE := $(NEWLIB_NAME)
+else
+NEWLIB_DIR  := $(patsubst %/,%,$(dir $(NEWLIB_NAME)))
+NEWLIB_FILE := $(notdir $(NEWLIB_NAME))
+endif
+
 newlib:
 ifeq ($(NEWLIB_ARG),)
-	$(error Usage: make newlib <name>  e.g. make newlib spi_driver)
+	$(error Usage: make newlib <name> or make newlib <dir>/<name>  e.g. make newlib sensors/mpu6050_driver)
 endif
-	mkdir -p $(LIB_DIR)/$(NEWLIB_ARG)
-	printf '/*\n    Author: Henry Centeno\n    Description:\n*/\n' > $(LIB_DIR)/$(NEWLIB_ARG)/$(NEWLIB_ARG).c
-	printf '/*\n    Author: Henry Centeno\n    Description:\n*/\n' > $(LIB_DIR)/$(NEWLIB_ARG)/$(NEWLIB_ARG).h
-	code $(LIB_DIR)/$(NEWLIB_ARG)/$(NEWLIB_ARG).h
-	@echo "created $(LIB_DIR)/$(NEWLIB_ARG)/$(NEWLIB_ARG).c and $(LIB_DIR)/$(NEWLIB_ARG)/$(NEWLIB_ARG).h"
+	@mkdir -p $(LIB_DIR)/$(NEWLIB_DIR)
+	@for ext in c h; do \
+	  f=$(LIB_DIR)/$(NEWLIB_DIR)/$(NEWLIB_FILE).$$ext; \
+	  if [ -e "$$f" ]; then echo "skipped $$f (already exists)"; \
+	  else printf '/*\n    Author: Henry Centeno\n    Description:\n*/\n' > "$$f"; echo "created $$f"; fi; \
+	done
+	code $(LIB_DIR)/$(NEWLIB_DIR)/$(NEWLIB_FILE).h
 endif
 
 # `make listlib`: enumerate every lib/*/*.c file that `make lib <name>`
@@ -216,6 +240,11 @@ flash-$(1): $(BIN_DIR)/$(1).elf
 	openocd -f interface/stlink.cfg -f target/stm32g4x.cfg \
 	  -c "reset_config srst_only srst_nogate connect_assert_srst" \
 	  -c "program $$< verify reset exit"
+
+# make disarm-blink -> build + page through the disassembly (C source interleaved with asm)
+disarm-$(1): $(BIN_DIR)/$(1).elf
+	@$(OBJDUMP) -d -S $$< | less
+
 endef
 
 $(foreach prog,$(PROGRAMS),$(eval $(call PROGRAM_template,$(prog))))
@@ -266,15 +295,16 @@ HELP:
 	@echo "Embedded_Projects Makefile -- available targets"
 	@echo ""
 	@echo "Top level (run from Embedded_Projects/):"
-	@echo "  make <project>            to build a project."
-	@echo "  make flash-<project>      to flash it."
-	@echo "  make clean [proj ...]     to remove the bin directory for the named projects. If no project was given, will remove each bin directory in all the project directories."
-	@echo "  make list                 list out every project"
-	@echo "  make project <name>       create a new project dir"
-	@echo "  make lib <name>           compile the given lib source file for a syntax check, does not link"
-	@echo "  make newlib <name>        create a new lib directory for thesource and header files"
-	@echo "  make listlib              list every library available under the lib directory"
-	@echo "  make HELP                 show this message"
+	@echo "  make <project>                   to build a project."
+	@echo "  make flash-<project>             to flash it."
+	@echo "  make disarm-<project>            to to view the assembly generated."
+	@echo "  make clean [proj ...]            to remove the bin directory for the named projects. If no project was given, will remove each bin directory in all the project directories."
+	@echo "  make list                        list out every project"
+	@echo "  make project <name>              create a new project dir"
+	@echo "  make lib <name>|<dir>/<name>     compile the given lib source file for a syntax check, does not link"
+	@echo "  make newlib <name>|<dir>/<name>  create a lib source/header pair (new dir, or add to an existing one)"
+	@echo "  make listlib                     list every library available under the lib directory"
+	@echo "  make HELP                        show this message"
 ifneq ($(PROJECTS),)
 	@echo ""
 	@echo "Projects found here:"
