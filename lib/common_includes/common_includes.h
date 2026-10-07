@@ -12,4 +12,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#define TO_BYTE_ARRAY(X) ((uint8_t *)&X) //convert into x into an array of bytes
+
 #endif
