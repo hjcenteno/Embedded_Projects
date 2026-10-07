@@ -64,7 +64,7 @@ int main(void){
     }
 
     //read the raw data first
-    while(readSensorEn){
+    while(readSensorEn){ //NOLINT(bugprone-infinite-loop): tell clang this is intentional
         //read the registers from the ACCX_OUT_REG_H (0x38) to GYROZ_OUT_REG_L (0x48)
         if(i2c_master_read(mpu6050_saddr_0, MPU6050_DATA_START_ADDR, TO_BYTE_ARRAY(mainSensor), sizeof(mainSensor)) == 0){
            client_transmit(TO_BYTE_ARRAY(mainSensor), sizeof(mainSensor));
