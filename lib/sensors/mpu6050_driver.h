@@ -17,7 +17,14 @@
 #define mpu6050_saddr_1 (0x69u) //the slave address of the mpu6050 if the ado pin is set high
 #define DEGREES_TO_RADIAN(x) ((x * M_PI) / 180) //avoid the mcu from doing the calculations
 #define RADIAN_TO_DEGREES(x) ((x * 180) / M_PI)
-#define MPU6050_CALIBRATION_CONST (0) //calibration const to normalize the data
+
+//constants from testings, unique to this board
+#define MPU6050_ACCX_OFFSET ((1.053 - 0.954) / 2) //in testing, the upright the y axis averaged to 1.053, downright was 0.954
+#define MPU6050_ACCX_SCALE ((1.053 + 0.954) / 2)
+#define MPU6050_ACCY_OFFSET ((0.978 - 1.028) / 2) //in testing, the upright the y axis averaged to .978, downright was 1.028
+#define MPU6050_ACCY_SCALE ((0.978 + 1.028) / 2)
+#define MPU6050_ACCZ_OFFSET ((1.139 - 0.911) / 2) //in testing, the upright the z axis averaged to 1.139, downright was 0.911
+#define MPU6050_ACCZ_SCALE ((1.139 + 0.911) / 2)
 
 //register and bit defines
 /*
@@ -139,6 +146,7 @@ void purify_read_lsb(mpu6050_t *mpu6050); //call to push the data read to make i
 void zero_out_mpu6050(mpu6050_t *mpu6050);
 
 //calculate the data
+void applyAccCalibration(accelf_t *axises);
 float kalman_filter(mpu6050_t *mpu6050);
 float calculate_roll(mpu6050_t *mpu6050);
 float calculate_pitch(mpu6050_t *mpu6050);

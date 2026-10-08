@@ -66,12 +66,15 @@ int main(void){
     //read the raw data first
     while(readSensorEn){ //NOLINT(bugprone-infinite-loop): tell clang this is intentional
         //read the registers from the ACCX_OUT_REG_H (0x38) to GYROZ_OUT_REG_L (0x48)
-        float accZ; //going to test for just the Z axis first since that just means the sensor lays flat
+        accelf_t calibratedAccAxis;
         if(i2c_master_read(mpu6050_saddr_0, MPU6050_DATA_START_ADDR, TO_BYTE_ARRAY(mainSensor), sizeof(mainSensor)) == 0){
             purify_read_lsb(&mainSensor); //from MSB to LSB
-            accZ = (float)mainSensor.accX / MPU6050_ACC_SENSITIVITY_0;
-            client_transmit(TO_BYTE_ARRAY(accZ), sizeof(accZ));
-            delay_s(1);
+            calibratedAccAxis.x = (float)mainSensor.accX / MPU6050_ACC_SENSITIVITY_0;
+            calibratedAccAxis.y = (float)mainSensor.accY / MPU6050_ACC_SENSITIVITY_0;
+            calibratedAccAxis.z = (float)mainSensor.accZ / MPU6050_ACC_SENSITIVITY_0;
+            applyAccCalibration(&calibratedAccAxis);
+            client_transmit(TO_BYTE_ARRAY(calibratedAccAxis), sizeof(calibratedAccAxis));
+            delay_ms(500);
         }
     }
 
