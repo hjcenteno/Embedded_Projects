@@ -29,3 +29,9 @@ void purify_read_lsb(mpu6050_t *mpu6050){
     mpu6050->gyroZ = (int16_t)(((uint16_t)mpu6050->gyroZ << 8) | ((uint16_t)mpu6050->gyroZ >> 8));
     mpu6050->temp = (int16_t)(((uint16_t)mpu6050->temp << 8) | ((uint16_t)mpu6050->temp >> 8));
 }
+
+void applyAccCalibration(accelf_t *axises){
+    axises->x = (axises->x - MPU6050_ACCX_OFFSET) / MPU6050_ACCX_SCALE;
+    axises->y = (axises->y - MPU6050_ACCY_OFFSET) / MPU6050_ACCY_SCALE;
+    axises->z = (axises->z - MPU6050_ACCZ_OFFSET) / MPU6050_ACCZ_SCALE;
+}
