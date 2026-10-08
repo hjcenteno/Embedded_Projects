@@ -62,6 +62,7 @@ int main(void){
         readSensorEn = false;
         GPIOA->BSRR = GPIO_BSRR_BS9;
     }
+    delay_ms(100); //wait for it power on
 
     //read the raw data first
     while(readSensorEn){ //NOLINT(bugprone-infinite-loop): tell clang this is intentional
