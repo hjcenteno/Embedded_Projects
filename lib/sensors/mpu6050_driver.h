@@ -19,12 +19,12 @@
 #define RADIAN_TO_DEGREES(x) ((x * 180) / M_PI)
 
 //constants from testings, unique to this board
-#define MPU6050_ACCX_OFFSET ((1.053 - 0.954) / 2) //in testing, the upright the y axis averaged to 1.053, downright was 0.954
-#define MPU6050_ACCX_SCALE ((1.053 + 0.954) / 2)
-#define MPU6050_ACCY_OFFSET ((0.978 - 1.028) / 2) //in testing, the upright the y axis averaged to .978, downright was 1.028
-#define MPU6050_ACCY_SCALE ((0.978 + 1.028) / 2)
-#define MPU6050_ACCZ_OFFSET ((1.139 - 0.911) / 2) //in testing, the upright the z axis averaged to 1.139, downright was 0.911
-#define MPU6050_ACCZ_SCALE ((1.139 + 0.911) / 2)
+#define MPU6050_ACCX_OFFSET (float)((1.053f - 0.954f) / 2.0f) //in testing, the upright the y axis averaged to 1.053, downright was 0.954
+#define MPU6050_ACCX_SCALE (float)((1.053f + 0.954f) / 2.0f)
+#define MPU6050_ACCY_OFFSET (float)((0.978f - 1.028f) / 2.0f) //in testing, the upright the y axis averaged to .978, downright was 1.028
+#define MPU6050_ACCY_SCALE (float)((0.978f + 1.028f) / 2.0f)
+#define MPU6050_ACCZ_OFFSET (float)((1.139f - 0.911f) / 2.0f) //in testing, the upright the z axis averaged to 1.139, downright was 0.911
+#define MPU6050_ACCZ_SCALE (float)((1.139f + 0.911f) / 2.0f)
 
 //register and bit defines
 /*
