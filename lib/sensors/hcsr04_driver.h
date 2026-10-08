@@ -24,7 +24,7 @@ typedef struct hcsr04_t{
 
 void init_HCSR04(hcsr04_t *hcsr04, uint32_t priority);
 void trigger_HCSR04(void);
-float getDistance_HCSR04(hcsr04_t *hcsr04);
+float getDistance_HCSR04(const hcsr04_t *hcsr04);
 static inline void hcsr04_IRQHandler(hcsr04_t *hcsr04){
     //inline to avoid adding an extra function call
     //tim2 read a rising/falling edge

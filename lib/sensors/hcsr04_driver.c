@@ -52,7 +52,7 @@ void trigger_HCSR04(void){
     GPIOA->BSRR = GPIO_BSRR_BR10; //set it low
 }
 
-float getDistance_HCSR04(hcsr04_t *hcsr04){
+float getDistance_HCSR04(const hcsr04_t *hcsr04){
     /*
         gets the distance in inches following this formula from the hcsr04 user manual
         distance = pulse width(uS) / 148 for inches
