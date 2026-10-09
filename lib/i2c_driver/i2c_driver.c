@@ -59,14 +59,63 @@ static inline void disable_i2c(void){
 void reset_i2c(void){
     //reset the i2c by dsiabling it then wait for it to turn back on
     //reset flags incase of the errors
-    if(I2C1->ISR & (I2C_ISR_ARLO | I2C_ISR_BERR)){
-        I2C1->ICR = (I2C_ICR_ARLOCF | I2C_ICR_BERRCF);
+    if(I2C1->ISR & (I2C_ISR_ARLO | I2C_ISR_BERR | I2C_ISR_TIMEOUT)){
+        I2C1->ICR = (I2C_ICR_ARLOCF | I2C_ICR_BERRCF | I2C_ISR_TIMEOUT);
     }
 
     I2C1->CR1 &= ~I2C_CR1_PE;
-    while(I2C1->CR1 & I2C_CR1_PE){}
+    while(I2C1->CR1 & I2C_CR1_PE){} //PE must be kept low during at least three APB clock cycles to perform the I2C reset
     I2C1->CR1 |= I2C_CR1_PE;
 
+}
+
+static void no_tim_delay(void){
+    //no tim is enabled, so just use the cpu to do the delay
+    for(uint8_t i = 0; i < 50; i++){}
+}
+
+/* 
+in case of a bad transmission, per I2C specification chapter 3.1.16 Bus Clear:
+    "If the data line (SDA) is stuck LOW, the controller should send nine clock pulses.
+    The device that held the bus LOW should release it sometime within those nine clocks."
+    https://www.nxp.com/docs/en/user-guide/UM10204.pdf
+*/
+void recover_i2c(void){
+    //recover the sda/scl lines
+    disable_i2c();
+    
+    GPIOB->BSRR = (GPIO_BSRR_BS8 | GPIO_BSRR_BS9); //set both lines to high
+    //set pb8/9 to general purpose output + open drain
+    GPIOB->MODER &= ~(GPIO_MODER_MODE8 |GPIO_MODER_MODE9);
+    GPIOB->MODER |= (GPIO_MODER_MODE8_0 |GPIO_MODER_MODE9_0); //output is '01'
+    no_tim_delay();
+
+    //toggle the scl (pb8) line 9 times
+    //also check if the sda is low meaning the device still holds the line
+    for(uint8_t i = 0; (i < 9); i++){ 
+        if(GPIOB->IDR & GPIO_IDR_ID9){ //sda is low
+            break;
+        }
+        GPIOB->BSRR = GPIO_BSRR_BR8;
+        no_tim_delay();
+        GPIOB->BSRR = GPIO_BSRR_BS8;
+    }
+
+    //generate a stop condition by setting sda from low to high while the scl is high
+    GPIOB->BSRR = (GPIO_BSRR_BS8 | GPIO_BSRR_BR9);
+    no_tim_delay();
+    GPIOB->BSRR = GPIO_BSRR_BS9;
+    no_tim_delay();
+
+    //go back to alternate mode
+    //setup the pb8/9 pins moder to AF
+    GPIOB->MODER &= ~(GPIO_MODER_MODE8 |GPIO_MODER_MODE9);
+    GPIOB->MODER |= (GPIO_MODER_MODE8_1 |GPIO_MODER_MODE9_1);
+    //setup each pins AF to af4 (pb8: i2c-scl, pb9: i2c-sda)
+    GPIOB->AFR[1] &= ~(GPIO_AFRH_AFSEL8 | GPIO_AFRH_AFSEL9);
+    GPIOB->AFR[1] |= (GPIO_AFRH_AFSEL8_2 | GPIO_AFRH_AFSEL9_2);
+
+    I2C1->CR1 |= I2C_CR1_PE;
 }
 
 int init_i2c(i2c_mode mode){
@@ -94,6 +143,8 @@ int init_i2c(i2c_mode mode){
         since the most the i2c can operate is up to 1MHZ, no need to set the ospeedr as '00'
         can handle up to 10 MHz at 10 pF per the datasheet at page 131. 
     */
+    GPIOB->PUPDR &= ~(GPIO_PUPDR_PUPDR8 | GPIO_PUPDR_PUPD9);
+    GPIOB->PUPDR |= (GPIO_PUPDR_PUPDR8_0 | GPIO_PUPDR_PUPD9_0); //use the pull up in case some wire disconnects
     GPIOB->OTYPER &= ~(GPIO_OTYPER_OT8| GPIO_OTYPER_OT9);
     GPIOB->OTYPER |= (GPIO_OTYPER_OT8| GPIO_OTYPER_OT9); //set to open drain
     
@@ -110,6 +161,14 @@ int init_i2c(i2c_mode mode){
     //keeping the nostretch bit off as the mcu will act as the controller
     set_timingr_settings(mode);
 
+    //set up the timeout 
+    I2C1->TIMEOUTR &= ~(
+        I2C_TIMEOUTR_TEXTEN | I2C_TIMEOUTR_TIDLE | I2C_TIMEOUTR_TIMOUTEN |
+        I2C_TIMEOUTR_TIMEOUTA | I2C_TIMEOUTR_TIMEOUTB
+    );
+    I2C1->TIMEOUTR |= I2C_TIMEOUTR_TIMEOUTA | I2C_TIMEOUTR_TIMEOUTB; //set it to the max time
+    I2C1->TIMEOUTR |= (I2C_TIMEOUTR_TEXTEN | I2C_TIMEOUTR_TIMOUTEN); //enable the timeout and extension
+
     //configuring cr2
     //configure for 7 bit addressing by leaving the add10 bit as 0
     I2C1->CR2 &= ~(I2C_CR2_ADD10 | I2C_CR2_AUTOEND | I2C_CR2_RELOAD); //create a clean slate 
@@ -120,9 +179,9 @@ int init_i2c(i2c_mode mode){
 
 static int i2c_transmit_addr(uint8_t addr){
     //writes the addr to the txdr of the i2c
-    while((I2C1->ISR & (I2C_ISR_NACKF | I2C_ISR_TXIS)) == 0){}
+    while((I2C1->ISR & (I2C_ISR_NACKF | I2C_ISR_TXIS | I2C_ISR_TIMEOUT)) == 0){}
 
-    if(I2C1->ISR & I2C_ISR_NACKF){ //end when the nackf == 1
+    if(I2C1->ISR & (I2C_ISR_NACKF | I2C_ISR_TIMEOUT)){ //end when the nackf == 1
         return 1;
     }
 
@@ -134,9 +193,9 @@ static int i2c_transmit_addr(uint8_t addr){
 static int i2c_transmit_data(const uint8_t *data, uint8_t length){
     //return 1 on nack, arlo, or berr 
     for(uint8_t i = 0; i < length; i++){
-        while((I2C1->ISR & (I2C_ISR_NACKF | I2C_ISR_TXIS | I2C_ISR_ARLO | I2C_ISR_BERR)) == 0){} //wait until either the txis or nackf is set to 1
+        while((I2C1->ISR & (I2C_ISR_NACKF | I2C_ISR_TXIS | I2C_ISR_ARLO | I2C_ISR_BERR | I2C_ISR_TIMEOUT)) == 0){} //wait until either the txis or nackf is set to 1
 
-        if(I2C1->ISR & (I2C_ISR_NACKF | I2C_ISR_ARLO | I2C_ISR_BERR)){ //end when the nackf == 1 or an error occured
+        if(I2C1->ISR & (I2C_ISR_NACKF | I2C_ISR_ARLO | I2C_ISR_BERR | I2C_ISR_TIMEOUT)){ //end when the nackf == 1 or an error occured
             return 1;
         }
 
@@ -150,9 +209,9 @@ static int i2c_transmit_data(const uint8_t *data, uint8_t length){
 static int i2c_read_data(uint8_t *data, uint8_t length){
     //return 1 upon a bus error or arbitration loss
     for(uint8_t i = 0; i < length; i++){
-        while((I2C1->ISR & (I2C_ISR_ARLO | I2C_ISR_BERR | I2C_ISR_RXNE)) == 0){} //wait until rxne == 1
+        while((I2C1->ISR & (I2C_ISR_ARLO | I2C_ISR_BERR | I2C_ISR_RXNE | I2C_ISR_TIMEOUT)) == 0){} //wait until rxne == 1
     
-        if(I2C1->ISR & (I2C_ISR_ARLO | I2C_ISR_BERR)){
+        if(I2C1->ISR & (I2C_ISR_ARLO | I2C_ISR_BERR | I2C_ISR_TIMEOUT)){
             return 1;
         }
 
@@ -196,7 +255,12 @@ int i2c_master_write(uint8_t saddr, uint8_t regaddr, const uint8_t *data, uint8_
     }
 
     //only transmit if communication is not being processed
-    while(I2C1->ISR & I2C_ISR_BUSY){}
+   uint32_t busy_timeout = MAX_TIMEOUT; //max amount of iterations the isr busy can wait for
+    while(I2C1->ISR & I2C_ISR_BUSY){
+        if((--busy_timeout) == 0){
+            return 1;
+        }
+    }
     
     //creating a clean slate for cr2
     clean_i2c_cr2(saddr, (dLength + 1), false, true); //controller will automatically send a stop condition once nbytes are sent
@@ -209,6 +273,12 @@ int i2c_master_write(uint8_t saddr, uint8_t regaddr, const uint8_t *data, uint8_
     
     if(result == 0){
         result = i2c_transmit_data(data, dLength);
+    }
+
+    //error check on a bad transfers
+    if(result == 1){
+        reset_i2c();
+        return 1;
     }
     
     //wait until the transmission ends clear with the icr
@@ -230,7 +300,12 @@ int i2c_master_read(uint8_t saddr, uint8_t regaddr, uint8_t *data, uint8_t dLeng
     }
 
     //only read if communication is not being processed
-    while(I2C1->ISR & I2C_ISR_BUSY){}
+    uint32_t busy_timeout = MAX_TIMEOUT; //max amount of iterations the isr busy can wait for
+    while(I2C1->ISR & I2C_ISR_BUSY){
+        if((--busy_timeout) == 0){
+            return 1;
+        }
+    }
 
     //following figure 554 of the reference manual for controller receiver, n <= 255
     //reading is split into first transmitting the register address, then reading
