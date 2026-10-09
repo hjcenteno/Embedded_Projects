@@ -2,12 +2,15 @@
     Author: Henry Centeno
     Description:
         I2C implementation for my stm32 nucleo-g474re.
+        start conditions is scl high and sda low
 */
 
 #ifndef I2C_DRIVER_H
 #define I2C_DRIVER_H
 
 #include "common_includes/common_includes.h"
+
+#define MAX_TIMEOUT (0x000fffffu) 
 
 typedef enum i2c_mode{
     standard, //up to 100 khz
@@ -22,6 +25,7 @@ typedef enum i2c_mode{
 */
 int init_i2c(i2c_mode mode);
 void reset_i2c(void); //reset the i2c
+void recover_i2c(void);
 /*
     uint8_t maddr: master address
     uint8_t saddr: slave address
