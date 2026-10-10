@@ -137,7 +137,7 @@ float complementary_filter(const float theta, const float gyroRate, const float 
     float predictedTheta = 0;
 
     //angle = (1 - alpha) * (angle + gyroscope * dt) + alpha * accelerometer
-    predictedTheta =  MPU6050_ALPHA* (theta + (gyroRate * dt)) + (accAxis * MPU6050_ALPHA_MINUS_ONE);
+    predictedTheta =  MPU6050_ALPHA* (theta + (gyroRate * (float)dt)) + (accAxis * MPU6050_ALPHA_MINUS_ONE);
 
     return predictedTheta;
 }
