@@ -51,6 +51,7 @@ int purify_read_lsb(raw_mpu6050_t *mpu6050){
 }
 
 int applyAccCalibration(accelf_t *axises){
+    //applies the correction from the raw int readings to be stored as floats
     if(axises == NULL){
         return 1;
     }
@@ -63,6 +64,7 @@ int applyAccCalibration(accelf_t *axises){
 }
 
 int applyGyroCalibration(gyrof_t *axises){
+    //applies the correction from the raw int readings to be stored as floats
     if(axises == NULL){
         return 1;
     }
@@ -75,16 +77,19 @@ int applyGyroCalibration(gyrof_t *axises){
 }
 
 int applyTempCalibration(cal_mpu6050_t *mpu6050){
+    //applies the correction from the raw int readings to be stored as floats
     if(mpu6050 == NULL){
         return 1;
     }
 
-    mpu6050->temp *= 1;
+    //I am thinking of perhaps using the temp for sensor correction
+    mpu6050->temp *= 1; //haven't calibrate or test for temp yet
 
     return 0;
 }
 
 int applyFullCalibrations(cal_mpu6050_t *mpu6050){
+    //apply the calibrations to both the accelerometer and gyrometer readings
     if(mpu6050 == NULL){
         return 1;
     }
@@ -96,13 +101,25 @@ int applyFullCalibrations(cal_mpu6050_t *mpu6050){
     accelReadings.y = mpu6050->accY;
     accelReadings.z = mpu6050->accZ;
 
-
     gyroReadings.x = mpu6050->gyroX;
     gyroReadings.y = mpu6050->gyroY;
     gyroReadings.z = mpu6050->gyroZ;
 
+    //calibrate the readings
     applyAccCalibration(&accelReadings);
+    //store the calibrations
+    mpu6050->accX = accelReadings.x;
+    mpu6050->accY = accelReadings.y;
+    mpu6050->accZ = accelReadings.z;
+    
+    //calibrate the readings
     applyGyroCalibration(&gyroReadings);
+    //store the calibrations
+    mpu6050->gyroX = gyroReadings.x;
+    mpu6050->gyroY = gyroReadings.y;
+    mpu6050->gyroZ = gyroReadings.z;
+    
+
     applyTempCalibration(mpu6050);
 
     return 0;
