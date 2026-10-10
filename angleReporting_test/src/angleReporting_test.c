@@ -114,8 +114,9 @@ int main(void){
         // delay_ms(300);
 
         //get the roll and pitch angles in radians
-        angles.roll = calculate_roll(mainSensor.cal_ptr, angles.roll, ((currentTime - startTime) * MICRO_TO_BASE)); //getTime gets the time in us
-        angles.pitch = calculate_pitch(mainSensor.cal_ptr, angles.pitch, ((currentTime - startTime) * MICRO_TO_BASE)); 
+        float dt = ((float)(currentTime - startTime)) * MICRO_TO_BASE; //convert the dt to float first then convert the base
+        angles.roll = calculate_roll(mainSensor.cal_ptr, angles.roll, dt); //getTime gets the time in us
+        angles.pitch = calculate_pitch(mainSensor.cal_ptr, angles.pitch, dt); 
         client_transmit(TO_BYTE_ARRAY(angles), sizeof(angles));
         startTime = currentTime;
     }
