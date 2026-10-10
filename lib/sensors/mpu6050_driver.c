@@ -151,7 +151,7 @@ float calculate_roll(const cal_mpu6050_t *mpu6050, const uint32_t dt){
     float x_squared = mpu6050->accX * mpu6050->accX;
     float y_squared = mpu6050->accY * mpu6050->accY;
     float xz_sqrt = (float)sqrt((x_squared) + (y_squared));
-    angle = (float)atan2(mpu6050->accY, xz_sqrt);
+    angle = atan2f(mpu6050->accY, xz_sqrt); //per the man atan2 paeg, returns in radians
 
     //pass the angle through the complimentary filter
     //roll = alpha * (roll + gyroscope_y * dt) + (1 - alpha) * accelerometer_y
@@ -169,7 +169,7 @@ float calculate_pitch(const cal_mpu6050_t *mpu6050, const uint32_t dt){
     float z_squared = mpu6050->accZ * mpu6050->accZ;
     float y_squared = mpu6050->accY * mpu6050->accY;
     float yz_sqrt = (float)sqrt((z_squared) + (y_squared));
-    angle = (float)atan2(mpu6050->accX, yz_sqrt);
+    angle = atan2f(mpu6050->accX, yz_sqrt); //per the man atan2 paeg, returns in radians
 
     //pass the angle through the complimentary filter
     //pitch = 0.98 * (pitch + gyroscope_x * dt) + 0.02* accelerometer_x
