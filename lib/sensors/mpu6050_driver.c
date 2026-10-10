@@ -133,34 +133,33 @@ int applyFullCalibrations(cal_mpu6050_t *mpu6050){
     sources
         1. hibit: https://www.hibit.dev/posts/92/complementary-filter-and-relative-orientation-with-mpu6050
 */
-float complementary_filter(const float theta, const float gyroRate, const float accAxis, const uint32_t dt){
+float complementary_filter(const float theta, const float gyroRate, const float accAngle, const float dt){
     float predictedTheta = 0;
 
     //angle = (1 - alpha) * (angle + gyroscope * dt) + alpha * accelerometer
-    predictedTheta =  MPU6050_ALPHA* (theta + (gyroRate * (float)dt)) + (accAxis * MPU6050_ALPHA_MINUS_ONE);
+    predictedTheta =  MPU6050_ALPHA* (theta + (DEGREES_TO_RADIAN(gyroRate) * dt)) + (accAngle * MPU6050_ALPHA_MINUS_ONE);
 
     return predictedTheta;
 }
 
-float calculate_roll(const cal_mpu6050_t *mpu6050, const uint32_t dt){
+float calculate_roll(const cal_mpu6050_t *mpu6050, const float prevRoll, const float dt){
     //calculate the roll angle through the complimentary angle
     float angle;
 
     //from hibit, using angle formulas to calculate the roll angle
     //roll = atan2(accelerometer_y, sqrt(accelerometer_x^2 + accelerometer_z^2))
     float x_squared = mpu6050->accX * mpu6050->accX;
-    float y_squared = mpu6050->accY * mpu6050->accY;
-    float xz_sqrt = (float)sqrt((x_squared) + (y_squared));
-    angle = (float)atan2(mpu6050->accY, xz_sqrt);
+    float z_squared = mpu6050->accZ * mpu6050->accZ;
+    float xz_sqrt = sqrtf((x_squared) + (z_squared));
+    angle = atan2f(mpu6050->accY, xz_sqrt); //per the man atan2 paeg, returns in radians
 
     //pass the angle through the complimentary filter
-    //roll = alpha * (roll + gyroscope_y * dt) + (1 - alpha) * accelerometer_y
-    angle = complementary_filter(angle, mpu6050->gyroY, mpu6050->accY, dt);
+    angle = complementary_filter(prevRoll, mpu6050->gyroX, angle, dt);
 
     return angle;
 }
 
-float calculate_pitch(const cal_mpu6050_t *mpu6050, const uint32_t dt){
+float calculate_pitch(const cal_mpu6050_t *mpu6050, const float prevPitch, const float dt){
     //calculate the pitch angle through the complimentary angle
     float angle;
 
@@ -168,12 +167,11 @@ float calculate_pitch(const cal_mpu6050_t *mpu6050, const uint32_t dt){
     //pitch = atan2(accelerometer_x, sqrt(accelerometer_y^2 + accelerometer_z^2))
     float z_squared = mpu6050->accZ * mpu6050->accZ;
     float y_squared = mpu6050->accY * mpu6050->accY;
-    float yz_sqrt = (float)sqrt((z_squared) + (y_squared));
-    angle = (float)atan2(mpu6050->accX, yz_sqrt);
+    float yz_sqrt = sqrtf((z_squared) + (y_squared));
+    angle = atan2f(-mpu6050->accX, yz_sqrt); //per the man atan2 paeg, returns in radians
 
     //pass the angle through the complimentary filter
-    //pitch = 0.98 * (pitch + gyroscope_x * dt) + 0.02* accelerometer_x
-    angle = complementary_filter(angle, mpu6050->gyroX, mpu6050->accX, dt);
+    angle = complementary_filter(prevPitch, mpu6050->gyroY, angle, dt);
 
     return angle;
 }

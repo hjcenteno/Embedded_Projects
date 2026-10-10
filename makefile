@@ -17,13 +17,19 @@ OBJ_DIR       := $(BIN_DIR)/obj
 
 LIB_DIR       := ../lib
 
-CFLAGS   := $(MCU) -Wall -Wextra -g3 -gdwarf-4 -O0 -std=gnu11 -DSTM32G474xx \
-			-ffunction-sections -fdata-sections \
+CFLAGS   := $(MCU) -Wall -Wextra -g3 -gdwarf-4 -Og -std=gnu11 -DSTM32G474xx \
+            -ffunction-sections -fdata-sections \
+            -fno-math-errno \
+            -Wdouble-promotion \
             -I$(HDR_DIR) \
             -I$(LIB_DIR) \
             -I$(CMSIS_CORE)/CMSIS/Core/Include \
             -I$(CMSIS_DEVICE)/Include
 CFLAGS += $(EXTRA_CFLAGS)
+
+LDLIBS   := -lm
+LDLIBS   += $(EXTRA_LDLIBS)
+
 DEPFLAGS := -MMD -MP
 
 OBJDUMP  := arm-none-eabi-objdump
@@ -39,7 +45,7 @@ PROJECTS := $(sort $(foreach f,$(wildcard */src/*.c),$(firstword $(subst /, ,$(f
 MAKEFILE_PATH := $(abspath $(firstword $(MAKEFILE_LIST)))
 
 define PROJECT_template
-.PHONY: $(1) flash-$(1) clean-$(1)
+.PHONY: $(1) flash-$(1) disarm-$(1) clean-$(1)
 $(1):
 	$$(MAKE) -C $(1) -f $$(MAKEFILE_PATH) $(1)
 
@@ -226,7 +232,7 @@ LIB_OBJS_$(1) := $$(foreach l,$$(USED_LIBS_$(1)),$$(patsubst $(LIB_DIR)/%.c,$(OB
 OBJS_$(1) := $(OBJ_DIR)/$(1).o $$(patsubst $(HDR_DIR)/%.h,$(OBJ_DIR)/headers/%.o,$$(HDRS_$(1))) $$(LIB_OBJS_$(1)) $(COMMON_OBJS)
 
 $(BIN_DIR)/$(1).elf: $$(OBJS_$(1)) $(LINKER_SCRIPT) | $(BIN_DIR)
-	$(CC) $(MCU) -T$(LINKER_SCRIPT) -Wl,--gc-sections -Wl,-Map=$(BIN_DIR)/$(1).map -nostartfiles $$(filter-out $(LINKER_SCRIPT),$$^) -o $$@
+	$(CC) $(MCU) -T$(LINKER_SCRIPT) -Wl,--gc-sections -Wl,-Map=$(BIN_DIR)/$(1).map -nostartfiles $$(filter-out $(LINKER_SCRIPT),$$^) $(LDLIBS) -o $$@
 	$(SIZE) $$@
 	$(OBJCOPY) -O ihex $$@ $(BIN_DIR)/$(1).hex
 	$(OBJCOPY) -O binary $$@ $(BIN_DIR)/$(1).bin

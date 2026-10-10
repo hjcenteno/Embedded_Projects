@@ -139,6 +139,6 @@ void delay_s(uint32_t seconds){
         seconds = 3600; //capped at 60 seconds since 60 seconds is one hour
     }
 
-    uint32_t delay = seconds * MICRO_TO_BASE;
+    uint32_t delay = seconds * BASE_TO_MICRO;
     delay_us(delay);
 } 

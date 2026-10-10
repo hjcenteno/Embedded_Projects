@@ -15,8 +15,8 @@
 #define MPU6050_WHO_AM_I_REG (0x75u) //the register for the who am i
 #define mpu6050_saddr_0 (0x68u) //default slave address of the mpu6050
 #define mpu6050_saddr_1 (0x69u) //the slave address of the mpu6050 if the ado pin is set high
-#define DEGREES_TO_RADIAN(x) ((x * M_PI) / 180) //avoid the mcu from doing the calculations
-#define RADIAN_TO_DEGREES(x) ((x * 180) / M_PI)
+#define DEGREES_TO_RADIAN(x) (x * (float)(M_PI / 180)) //avoid the mcu from doing the calculations
+#define RADIAN_TO_DEGREES(x) (x * (float)(180 / M_PI))
 #define MPU6050_ALPHA (0.98f)
 #define MPU6050_ALPHA_MINUS_ONE (1 - MPU6050_ALPHA)
 
@@ -185,9 +185,9 @@ int applyFullCalibrations(cal_mpu6050_t *mpu6050); //performs all the calibratio
 
 //calculate the data
 float kalman_filter(cal_mpu6050_t *mpu6050);
-float complementary_filter(const float theta, const float gyroRate, const float accAxis, const uint32_t dt);
-float calculate_roll(const cal_mpu6050_t *mpu6050, const uint32_t dt);
-float calculate_pitch(const cal_mpu6050_t *mpu6050, const uint32_t dt);
-float calculate_yaw(const cal_mpu6050_t *mpu6050, const uint32_t dt); 
+float complementary_filter(const float theta, const float gyroRate, const float accAxis, const float dt);
+float calculate_roll(const cal_mpu6050_t *mpu6050, const float prevRoll, const float dt);
+float calculate_pitch(const cal_mpu6050_t *mpu6050, const float prevPitch, const float dt);
+float calculate_yaw(const cal_mpu6050_t *mpu6050, const float prevYaw, const float dt); 
 
 #endif
