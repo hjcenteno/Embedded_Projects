@@ -69,9 +69,9 @@ void reset_i2c(void){
 
 }
 
-static void no_tim_delay(void){
+static inline void no_tim_delay(void){
     //no tim is enabled, so just use the cpu to do the delay
-    for(uint8_t i = 0; i < 50; i++){}
+    for(volatile uint8_t i = 0; i < 50; i++){} //let compiler know not to optimize
 }
 
 /* 
@@ -92,7 +92,7 @@ void recover_i2c(void){
 
     //toggle the scl (pb8) line 9 times
     //also check if the sda is low meaning the device still holds the line
-    for(uint8_t i = 0; (i < 9); i++){ 
+    for(uint8_t i = 0; i < 9; i++){ 
         if(GPIOB->IDR & GPIO_IDR_ID9){ //sda is low
             break;
         }
