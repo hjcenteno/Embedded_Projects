@@ -10,21 +10,35 @@
 #define MPU6050_DRIVER_H
 
 #include "common_includes/common_includes.h"
-#include <math.h>
+#include <math.h> //at the moment using the std library, but if there are drifts I will switch to the cordic coprocessor
 
 #define MPU6050_WHO_AM_I_REG (0x75u) //the register for the who am i
 #define mpu6050_saddr_0 (0x68u) //default slave address of the mpu6050
 #define mpu6050_saddr_1 (0x69u) //the slave address of the mpu6050 if the ado pin is set high
 #define DEGREES_TO_RADIAN(x) ((x * M_PI) / 180) //avoid the mcu from doing the calculations
 #define RADIAN_TO_DEGREES(x) ((x * 180) / M_PI)
+#define MPU6050_ALPHA (0.98f)
+#define MPU6050_ALPHA_MINUS_ONE (1 - MPU6050_ALPHA)
 
+/*
+    data was retrieved by the following command:
+    stdbuf -oL ~/.../mpu6050_testListener/bin/mpu6050_testListener \
+        | awk -W interactive '{print} /x:/{if (++n == 1000) exit}' \
+        | tee z_down.txt
+    
+        With the kalman filter, no need to measure the gyro scale
+*/
 //constants from testings, unique to this board
-#define MPU6050_ACCX_OFFSET (float)((1.053f - 0.954f) / 2.0f) //in testing, the upright the y axis averaged to 1.053, downright was 0.954
-#define MPU6050_ACCX_SCALE (float)((1.053f + 0.954f) / 2.0f)
-#define MPU6050_ACCY_OFFSET (float)((0.978f - 1.028f) / 2.0f) //in testing, the upright the y axis averaged to .978, downright was 1.028
-#define MPU6050_ACCY_SCALE (float)((0.978f + 1.028f) / 2.0f)
-#define MPU6050_ACCZ_OFFSET (float)((1.139f - 0.911f) / 2.0f) //in testing, the upright the z axis averaged to 1.139, downright was 0.911
-#define MPU6050_ACCZ_SCALE (float)((1.139f + 0.911f) / 2.0f)
+#define MPU6050_ACCX_OFFSET (0.0501f)
+#define MPU6050_ACCX_SCALE (1.0063f)
+#define MPU6050_ACCY_OFFSET (-0.0248f)
+#define MPU6050_ACCY_SCALE (1.0050f)
+#define MPU6050_ACCZ_OFFSET (0.0723f)
+#define MPU6050_ACCZ_SCALE (1.0668f)
+
+#define MPU6050_GYROXX_OFFSET (-2.9596f)
+#define MPU6050_GYROXY_OFFSET (-2.9591f)
+#define MPU6050_GYROXZ_OFFSET (-0.6509f)
 
 //register and bit defines
 /*
@@ -116,7 +130,7 @@
 #define MPU6050_STBY_ZG_BIT (1 << 0)
 
 //send this as the data for the i2c to store the raw bytes
-typedef struct mpu6050_t{
+typedef struct raw_mpu6050_t{
     //matches how where each value is in stored registers
     int16_t accX;
     int16_t accY;
@@ -125,7 +139,25 @@ typedef struct mpu6050_t{
     int16_t gyroX;
     int16_t gyroY;
     int16_t gyroZ;
-}mpu6050_t;
+}raw_mpu6050_t;
+
+typedef struct cal_mpu6050_t{
+    //holds the data to do math from the raw data
+    float accX;
+    float accY;
+    float accZ;
+    float temp;
+    float gyroX;
+    float gyroY;
+    float gyroZ;
+}cal_mpu6050_t;
+
+typedef struct mpu6050_ptr{
+    //to pass both around
+    raw_mpu6050_t *raw_ptr;
+    cal_mpu6050_t *cal_ptr;
+}mpu6050_ptr; 
+
 
 //float struct of the normalized accelerometer data
 typedef struct accelf_t{
@@ -136,20 +168,26 @@ typedef struct accelf_t{
 
 //float struct of the normalized accelerometer data
 typedef struct gyrof_t{
-    float roll;
-    float pitch;
-    float yaw;
+    float x;
+    float y;
+    float z;
 }gyrof_t;
 
 //functions to do stuff to the mpu6050 sensor
-void purify_read_lsb(mpu6050_t *mpu6050); //call to push the data read to make it into least significant byte format
-void zero_out_mpu6050(mpu6050_t *mpu6050);
+int purify_read_lsb(raw_mpu6050_t *mpu6050); //call to push the data read to make it into least significant byte format
+int zero_out_mpu6050(mpu6050_ptr *mpu6050);
+
+//calibrations
+int applyAccCalibration(accelf_t *axises); //performs only for the accelerometer data
+int applyGyroCalibration(gyrof_t *axises); //performs only for the gyrometer data
+int applyTempCalibration(cal_mpu6050_t *mpu6050);
+int applyFullCalibrations(cal_mpu6050_t *mpu6050); //performs all the calibrations to the full cal_mpu6050_t struct
 
 //calculate the data
-void applyAccCalibration(accelf_t *axises);
-float kalman_filter(mpu6050_t *mpu6050);
-float calculate_roll(mpu6050_t *mpu6050);
-float calculate_pitch(mpu6050_t *mpu6050);
-float calculate_yaw(mpu6050_t *mpu6050);
+float kalman_filter(cal_mpu6050_t *mpu6050);
+float complementary_filter(const float theta, const float gyroRate, const float accAxis, const uint32_t dt);
+float calculate_roll(const cal_mpu6050_t *mpu6050, const uint32_t dt);
+float calculate_pitch(const cal_mpu6050_t *mpu6050, const uint32_t dt);
+float calculate_yaw(const cal_mpu6050_t *mpu6050, const uint32_t dt); 
 
 #endif
