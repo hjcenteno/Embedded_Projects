@@ -17,7 +17,7 @@ OBJ_DIR       := $(BIN_DIR)/obj
 
 LIB_DIR       := ../lib
 
-CFLAGS   := $(MCU) -Wall -Wextra -g3 -gdwarf-4 -Og -std=gnu11 -DSTM32G474xx \
+CFLAGS   := $(MCU) -Wall -Wextra -g3 -gdwarf-4 -Og -std=gnu2x -DSTM32G474xx \
             -ffunction-sections -fdata-sections \
             -fno-math-errno \
             -Wdouble-promotion \
