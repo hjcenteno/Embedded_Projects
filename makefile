@@ -205,29 +205,33 @@ all: $(addprefix $(BIN_DIR)/,$(addsuffix .elf,$(PROGRAMS)))
 
 COMMON_OBJS := $(OBJ_DIR)/startup_stm32g474xx.o $(OBJ_DIR)/system_stm32g4xx.o
 
-# NOTE: driver code under ../lib/<driver>/*.c is now scanned and linked
-# per-program (see USED_LIBS_$(1)/LIB_OBJS_$(1) inside PROGRAM_template
-# below) instead of globbing and compiling every lib/*/*.c for every
-# project. That old global approach meant an unrelated/half-finished
-# driver anywhere in ../lib could break every project's build, since
-# --gc-sections only strips unused code at link time -- it can't save
+# NOTE: driver code under ../lib is selected per-program, per-header (see
+# LIB_HDRS_$(1)/LIB_OBJS_$(1) inside PROGRAM_template below). The compiler
+# reports every ../lib/*.h the program transitively includes, and only the
+# .c file sitting next to each of those headers is compiled and linked.
+# So including sensors/mpu6050_driver.h builds mpu6050_driver.c but NOT
+# its neighbour sensors/hcsr04_driver.c -- an unrelated or half-finished
+# driver anywhere in ../lib (even in the same folder) can't break this
+# build. --gc-sections only strips unused code at link time; it can't save
 # you from a driver that fails to *compile* in the first place.
+#
+# Assumptions: each driver's .c has the same name/folder as its .h, and a
+# driver's dependencies on other drivers are visible through its .h (an
+# #include that lives only in a lib .c file is not scanned).
 
 define PROGRAM_template
 HDRS_$(1) := $$(shell $(CC) $(CFLAGS) -MM $(SRC_DIR)/$(1).c 2>/dev/null \
                | tr -d '\\' | tr ' ' '\n' \
                | grep -E '^$(HDR_DIR)/.*\.h$$$$')
 
-# Scan the program's own source + its local headers for subfolder-qualified
-# includes like #include "i2c_driver/i2c_driver.h", and only compile/link
-# the lib directories actually referenced -- unused libs are neither
-# compiled nor linked for this program, so a broken/unrelated driver
-# elsewhere in ../lib can't break this build.
-USED_LIBS_$(1) := $$(sort $$(filter $$(notdir $$(wildcard $(LIB_DIR)/*)), \
-    $$(shell grep -ohE '#include *"[A-Za-z0-9_]+/' $(SRC_DIR)/$(1).c $$(HDRS_$(1)) 2>/dev/null \
-        | sed -E 's/#include *"//; s#/##')))
+# every ../lib/*.h the program transitively includes (gcc resolves the -I paths)
+LIB_HDRS_$(1) := $$(sort $$(filter $(LIB_DIR)/%.h, \
+    $$(shell $(CC) $(CFLAGS) -MM $(SRC_DIR)/$(1).c $$(HDRS_$(1)) 2>/dev/null \
+        | tr -d '\\' | tr ' ' '\n')))
 
-LIB_OBJS_$(1) := $$(foreach l,$$(USED_LIBS_$(1)),$$(patsubst $(LIB_DIR)/%.c,$(OBJ_DIR)/lib/%.o,$$(wildcard $(LIB_DIR)/$$(l)/*.c)))
+# only the matching .c files that actually exist (header-only libs add nothing)
+LIB_OBJS_$(1) := $$(patsubst $(LIB_DIR)/%.c,$(OBJ_DIR)/lib/%.o, \
+    $$(wildcard $$(LIB_HDRS_$(1):.h=.c)))
 
 OBJS_$(1) := $(OBJ_DIR)/$(1).o $$(patsubst $(HDR_DIR)/%.h,$(OBJ_DIR)/headers/%.o,$$(HDRS_$(1))) $$(LIB_OBJS_$(1)) $(COMMON_OBJS)
 
