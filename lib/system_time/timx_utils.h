@@ -65,7 +65,7 @@ void init_AC_tim(TIM_TypeDef *timX); //sets up the advance control timer: tim 1/
 void init_GP_tim(TIM_TypeDef *timX); //sets up the general purpose timer: tim 2/3/4/5/15/16/17
 void init_tim_ccmr1(TIM_TypeDef *timX, const uint32_t channelMask, bool interruptEn); //initiates channels 1/2 for the tim, caller defines what they want with the mask
 void init_tim_ccmr2(TIM_TypeDef *timX, const uint32_t channelMask, bool interruptEn); //initiates channels 3/4 for the tim, caller defines what they want with the mask
-static uint32_t getTime(TIM_TypeDef *timX){ //gets the value of the cnt register of timX, 0 on error
+static inline uint32_t getTime(TIM_TypeDef *timX){ //gets the value of the cnt register of timX, 0 on error
     return (IS_TIM_INSTANCE(timX)) ? timX->CNT : 0;
 }
 
