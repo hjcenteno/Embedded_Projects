@@ -68,7 +68,7 @@ int init_tim(TIM_TypeDef *timX){
     }
 
     //determine what prescalar to use depending on the system clock
-    if(RCC->CFGR & RCC_CFGR_SWS_HSE){
+    if((RCC->CFGR & RCC_CFGR_SWS) == RCC_CFGR_SWS_HSE){
         timX->PSC = PRESCALAR_VALUE_24MHZ;
     }else{
         timX->PSC = PRESCALAR_VALUE_16MHZ;
@@ -99,15 +99,17 @@ void delay_us(TIM_TypeDef *timX, uint32_t microseconds){
 
     const uint32_t mask = IS_TIM_32B_COUNTER_INSTANCE(timX) ? MAX_TIME_32 : MAX_TIME_16;
     uint32_t startTime = getTime(timX);
-    while(microseconds > mask){
-        startTime = getTime(timX);
-        while(((getTime(timX) - startTime) & mask) < mask){}
-        microseconds -= mask;
-    }
+    while(microseconds){
+        uint32_t currentTime = getTime(timX);
+        uint32_t dt = (currentTime - startTime) & mask;
+        startTime = currentTime;
 
-    //pause execution until we hit the time to delay
-    startTime = getTime(timX);
-    while(((getTime(timX) - startTime) & mask) < microseconds){}
+        if(dt > microseconds){
+            break;
+        }
+
+        microseconds -= dt;
+    }
 } 
 
 //delay is done in microseconds, so when adding new delay functions, convert the time to microseconds)
