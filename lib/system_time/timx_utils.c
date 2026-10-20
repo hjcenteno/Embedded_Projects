@@ -60,3 +60,76 @@ int activate_SWS_RCC_HSE(void){
 
     return 0;
 }
+
+int init_tim(TIM_TypeDef *timX){
+    //check if the parameter passed was a valid tim
+    if(!IS_TIM_INSTANCE(timX)){
+        return 1;
+    }
+
+    //determine what prescalar to use depending on the system clock
+    if(RCC->CFGR & RCC_CFGR_SWS_HSE){
+        timX->PSC = PRESCALAR_VALUE_24MHZ;
+    }else{
+        timX->PSC = PRESCALAR_VALUE_16MHZ;
+    }
+
+    //set the arr to max time
+    const uint32_t mask = IS_TIM_32B_COUNTER_INSTANCE(timX) ? MAX_TIME_32 : MAX_TIME_16;
+    timX->ARR = mask;
+    //update the generation to start counting time
+    timX->EGR |= TIM_EGR_UG;
+
+    //enable the tim
+    timX->CR1 &= ~TIM_CR1_CEN;
+    timX->CR1 |= TIM_CR1_CEN;
+
+    return 0;
+}
+
+void delay_us(TIM_TypeDef *timX, uint32_t microseconds){
+    //amount of time to delay in microseconds (max of 2^32 -1 microseconds)
+    /*
+        max amount is simply because a uint32_t can only store a maximum of 2^32 - 1
+    */
+    //early return if tim not provided
+    if(!IS_TIM_INSTANCE(timX)){
+        return;
+    }
+
+    const uint32_t mask = IS_TIM_32B_COUNTER_INSTANCE(timX) ? MAX_TIME_32 : MAX_TIME_16;
+    uint32_t startTime = getTime(timX);
+    while(microseconds > mask){
+        startTime = getTime(timX);
+        while(((getTime(timX) - startTime) & mask) < mask){}
+        microseconds -= mask;
+    }
+
+    //pause execution until we hit the time to delay
+    startTime = getTime(timX);
+    while(((getTime(timX) - startTime) & mask) < microseconds){}
+} 
+
+//delay is done in microseconds, so when adding new delay functions, convert the time to microseconds)
+void delay_ms(TIM_TypeDef *timX, uint32_t milliseconds){
+    //amount of time to delay in milliseconds (max 4294000 milliseconds)
+    //the max amount comes from (2^32 -1) / 1000
+    if(milliseconds > 4294000){
+        milliseconds = 4294000; //capped at 4294000
+    }
+
+
+    uint32_t delay = milliseconds * MILLI_TO_MICRO;
+    delay_us(timX, delay);
+} 
+
+void delay_s(TIM_TypeDef *timX, uint32_t seconds){
+    //amount of time to delay in seconds (max one hour)
+    //the max of one hour is because 2^32 - 1 microseconds is roughly 1.2 hours
+    if(seconds > 3600){
+        seconds = 3600; //capped at 60 seconds since 60 seconds is one hour
+    }
+
+    uint32_t delay = seconds * BASE_TO_MICRO;
+    delay_us(timX, delay);
+} 

@@ -14,7 +14,8 @@
 
 #define PRESCALAR_VALUE_16MHZ (15) //The counter clock frequency tim_cnt_ck is equal to ftim_psc_ck / (PSC[15:0] + 1)
 #define PRESCALAR_VALUE_24MHZ (23) //The counter clock frequency tim_cnt_ck is equal to ftim_psc_ck / (PSC[15:0] + 1)
-#define MAX_TIME (0xFFFFFFFF)
+#define MAX_TIME_32 (0xFFFFFFFFu)
+#define MAX_TIME_16 (0xFFFFu)
 #define MILLI_TO_MICRO (1000u) //to convert from milli (10^-3) to micro (10^-6)
 #define MILLI_TO_BASE (1 / 1000f) //to convert from milli (10^-3) to base (10^0)
 #define MICRO_TO_BASE (1.0f / 1000000.0f) //to convert from micro (10^-6) to base (10^0)
@@ -59,20 +60,20 @@ int activate_SWS_RCC_HSE(void);
 /* sets up timX to act as a basic clock
  * TIM_TypeDef *timX: the timX
  */
-void init_tim(TIM_TypeDef *timX);
-void init_basic_tim(TIM_TypeDef *timX); //sets up tim6/7 as a basic timer
-void init_AC_tim(TIM_TypeDef *timX); //sets up the advance control timer: tim 1/8/20
-void init_GP_tim(TIM_TypeDef *timX); //sets up the general purpose timer: tim 2/3/4/5/15/16/17
-void init_tim_ccmr1(TIM_TypeDef *timX, const uint32_t channelMask, bool interruptEn); //initiates channels 1/2 for the tim, caller defines what they want with the mask
-void init_tim_ccmr2(TIM_TypeDef *timX, const uint32_t channelMask, bool interruptEn); //initiates channels 3/4 for the tim, caller defines what they want with the mask
+int init_tim(TIM_TypeDef *timX);
+int init_basic_tim(TIM_TypeDef *timX); //sets up tim6/7 as a basic timer
+int init_AC_tim(TIM_TypeDef *timX); //sets up the advance control timer: tim 1/8/20
+int init_GP_tim(TIM_TypeDef *timX); //sets up the general purpose timer: tim 2/3/4/5/15/16/17
+int init_tim_ccmr1(TIM_TypeDef *timX, const uint32_t channelMask, bool interruptEn); //initiates channels 1/2 for the tim, caller defines what they want with the mask
+int init_tim_ccmr2(TIM_TypeDef *timX, const uint32_t channelMask, bool interruptEn); //initiates channels 3/4 for the tim, caller defines what they want with the mask
 static inline uint32_t getTime(TIM_TypeDef *timX){ //gets the value of the cnt register of timX, 0 on error
     return (IS_TIM_INSTANCE(timX)) ? timX->CNT : 0;
 }
 
 //delay is done in microseconds, so when adding new delay functions, convert the time to microseconds)
-void delay_us(TIM_TypeDef timX, uint32_t microseconds); //amount of time to delay in microseconds
-void delay_ms(TIM_TypeDef timX, uint32_t milliseconds); //amount of time to delay in milliseconds
-void delay_s(TIM_TypeDef timX, uint32_t seconds); //amount of time to delay in seconds
+void delay_us(TIM_TypeDef *timX, uint32_t microseconds); //amount of time to delay in microseconds
+void delay_ms(TIM_TypeDef *timX, uint32_t milliseconds); //amount of time to delay in milliseconds
+void delay_s(TIM_TypeDef *timX, uint32_t seconds); //amount of time to delay in seconds
 
 
 #endif
