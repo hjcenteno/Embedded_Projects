@@ -3,15 +3,14 @@
         {
             "name": "STM32G474",
             "includePath": [
-                "${workspaceFolder}/**",
+                "${workspaceFolder}/lib",
                 "${env:HOME}/cmsis_core/CMSIS/Core/Include",
                 "${env:HOME}/cmsis_device_g4/Include"
             ],
-            "defines": [
-                "STM32G474xx"
-            ],
+            "defines": ["STM32G474xx"],
             "compilerPath": "/usr/bin/arm-none-eabi-gcc",
-            "cStandard": "gnu11",
+            "compilerArgs": ["-mcpu=cortex-m4", "-mthumb", "-mfpu=fpv4-sp-d16", "-mfloat-abi=hard"],
+            "cStandard": "gnu23",
             "intelliSenseMode": "linux-gcc-arm"
         }
     ],

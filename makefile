@@ -8,14 +8,14 @@ MCU      := -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 CMSIS_CORE   := $(HOME)/cmsis_core
 CMSIS_DEVICE := $(HOME)/cmsis_device_g4
 
-SRC_DIR       := src
+SRC_DIR       := $(abspath src)
 HDR_DIR       := $(SRC_DIR)/headers
-STARTUP_DIR   := ../startup
-LINKER_SCRIPT := ../linker/STM32G474RE_FLASH.ld
+STARTUP_DIR   := $(abspath ../startup)
+LINKER_SCRIPT := $(abspath ../linker/STM32G474RE_FLASH.ld)
 BIN_DIR       := bin
 OBJ_DIR       := $(BIN_DIR)/obj
 
-LIB_DIR       := ../lib
+LIB_DIR       := $(abspath ../lib)
 
 CFLAGS   := $(MCU) -Wall -Wextra -g3 -gdwarf-4 -Og -std=gnu2x -DSTM32G474xx \
             -ffunction-sections -fdata-sections \
