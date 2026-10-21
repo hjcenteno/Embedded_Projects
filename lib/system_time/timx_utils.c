@@ -11,7 +11,7 @@
  */
 int activate_SWS_RCC_HSE(void){
     //turn on the hse clock
-    const uint32_t MAX_TIMEOUT = 0xffffffff; //amount of cpu cycles for the while loops since we do not have a delay at the moment
+    const uint32_t MAX_TIMEOUT = 0xfffffu; //amount of cpu cycles for the while loops since we do not have a delay at the moment
     uint32_t i = 0;
 
     RCC->CR &= ~RCC_CR_HSEON;
@@ -134,4 +134,52 @@ void delay_s(TIM_TypeDef *timX, uint32_t seconds){
 
     uint32_t delay = seconds * BASE_TO_MICRO;
     delay_us(timX, delay);
-} 
+}
+
+int cfgr_tim_ccmr1(TIM_TypeDef *timX, const uint32_t io_ccrmr_msk, const uint32_t ccer_msk){
+    if(!IS_TIM_CC2_INSTANCE(timX)){ //check if the tim supports at least 2 channels
+        return 1;
+    }
+
+    timX->CCMR1 = 0; //ensure the ccmr1 has a clean slate
+    timX->CCER = 0; //ensure the ccer is clean as well
+
+    //set the registers by what the user specified
+    timX->CCMR1 |= io_ccrmr_msk;
+    timX->CCER |= ccer_msk;
+
+
+    return 0;
+}
+
+int cfgr_tim_ccmr2(TIM_TypeDef *timX, const uint32_t io_ccrmr_msk, const uint32_t ccer_msk){
+    if(!IS_TIM_CC4_INSTANCE(timX)){ //check if the channel handles at least 4 channels since this function configures channels 3/4
+        return 1;
+    }
+
+    //ensure the ccmr2 and ccer are in a clean slate
+    timX->CCMR2 = 0;
+    timX->CCER = 0;
+
+    timX->CCMR2 |= io_ccrmr_msk;
+    timX->CCER |= ccer_msk;
+
+    return 0;    
+}
+
+uint32_t update_pwm_dutyCycle(TIM_TypeDef *timX, float target_dc){
+    //duty_cycle = (timX->ccrX / timX->arr) * 100
+    //ensure the target_dc is between [0, 100]
+    if(target_dc > 100){
+        target_dc = 100;
+    }
+    else if(target_dc < 0){
+        target_dc = 0;
+    }
+    
+    float dutyCycleValue = 0; //what gets written to ccrx
+
+    dutyCycleValue = (target_dc * .01f) * (float)timX->ARR;
+
+    return (uint32_t)dutyCycleValue;
+}
