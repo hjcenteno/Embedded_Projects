@@ -20,11 +20,6 @@
 #define lse_hz 32768
 #define start_byte 0xAA
 
-typedef struct ringBuffer{
-    uint8_t buffer[MAX_RB_SIZE]; //represents the raw bytes to be read
-    uint8_t size; //go back to the beginning once size > MAX_RB_SIZE
-} ringBuffer;
-
 /*
 initiates the communication between the MCU (client) to the laptop (server).
 return 0 on success
