@@ -13,7 +13,7 @@
 */  
 
 #include "system_time/timx_utils.h"
-#define DC_STEP (1.0f) 
+#define DC_STEP (.10f) 
 
 void init_components(void){
     //set up the pa5 as the user led on the mcu (ld2)
@@ -45,7 +45,7 @@ int main(void){
     //write a duty cycle of 100% then step down till 0% then step back up
     cfgr_tim_ccmr2(TIM2, pwm_mask, ccer_mask);
     
-    uint32_t freq = 10000; //target pwm frequency
+    uint32_t freq = 1000; //target pwm frequency
     TIM2->ARR = freq;
     TIM2->CR1 |= TIM_CR1_ARPE; //buffer the new arr
     TIM2->EGR |= TIM_EGR_UG; //update the tim
