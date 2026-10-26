@@ -22,11 +22,13 @@
 #include "system_time/timx_utils.h"
 #include "sensors/mpu6050_driver.h"
 
+#define DC_STEP (1.0f)
+
 void init_pwm_pins(void){
     //initiates the pins for pwm
     //d13/pa5 => tim2_ch1 af1
-    //d12/pa6 => tim16_ch1 af1
-    //d11/pa7 => tim17_ch1 af1
+    //d12/pa6 => tim3_ch1 af2
+    //d11/pa7 => tim3_ch2 af2
     //d10/pb6 => tim4_ch1 af2
     RCC->AHB2ENR |= (RCC_AHB2ENR_GPIOAEN | RCC_AHB2ENR_GPIOBEN); //turn on the peripheral clock
     
@@ -41,8 +43,8 @@ void init_pwm_pins(void){
     GPIOB->MODER |= GPIO_MODER_MODE6_1;
     GPIOA->AFR[0] |= (
         (1u << GPIO_AFRL_AFSEL5_Pos) | 
-        (1u << GPIO_AFRL_AFSEL6_Pos) | 
-        (1u << GPIO_AFRL_AFSEL7_Pos)
+        (2u << GPIO_AFRL_AFSEL6_Pos) | 
+        (2u << GPIO_AFRL_AFSEL7_Pos)
     );
     GPIOB->AFR[0] |= (2u << GPIO_AFRL_AFSEL6_Pos);
 }
@@ -52,26 +54,23 @@ void setup_pwm_ch1(uint32_t targetHz, float initialDC){
     //rewrite the arr
     TIM2->ARR = targetHz;
     TIM4->ARR = targetHz;
-    TIM16->ARR = targetHz;
-    TIM17->ARR = targetHz;
+    TIM3->ARR = targetHz;
 
     //buffer it
     TIM2->CR1 |= TIM_CR1_ARPE;
     TIM4->CR1 |= TIM_CR1_ARPE;
-    TIM16->CR1 |= TIM_CR1_ARPE;
-    TIM17->CR1 |= TIM_CR1_ARPE;
+    TIM3->CR1 |= TIM_CR1_ARPE;
 
     //generate the update
     TIM2->EGR |= TIM_EGR_UG;
     TIM4->EGR |= TIM_EGR_UG;
-    TIM16->EGR |= TIM_EGR_UG;
-    TIM17->EGR |= TIM_EGR_UG;
+    TIM3->EGR |= TIM_EGR_UG;
 
     //set the duty cycles at 50%
     TIM2->CCR1 = update_pwm_dutyCycle(TIM2, initialDC);
     TIM4->CCR1 = update_pwm_dutyCycle(TIM4, initialDC);
-    TIM16->CCR1 = update_pwm_dutyCycle(TIM16, initialDC);
-    TIM17->CCR1 = update_pwm_dutyCycle(TIM17, initialDC);
+    TIM3->CCR1 = update_pwm_dutyCycle(TIM3, initialDC);
+    TIM3->CCR2 = update_pwm_dutyCycle(TIM3, initialDC);
 }
 
 int main(void){
@@ -80,30 +79,51 @@ int main(void){
     activate_SWS_RCC_HSE();
     
     //activate the tims needed, tim6 will act as a basic timer
-    RCC->APB1ENR1 |= (RCC_APB1ENR1_TIM2EN | RCC_APB1ENR1_TIM4EN | RCC_APB1ENR1_TIM6EN);
-    RCC->APB2ENR |= (RCC_APB2ENR_TIM16EN | RCC_APB2ENR_TIM17EN);
+    RCC->APB1ENR1 |= (
+        RCC_APB1ENR1_TIM2EN | RCC_APB1ENR1_TIM4EN | 
+        RCC_APB1ENR1_TIM3EN | RCC_APB1ENR1_TIM6EN
+    );
     init_tim(TIM2);
+    init_tim(TIM3);
     init_tim(TIM4);
-    init_tim(TIM16);
-    init_tim(TIM17);
     init_tim(TIM6);
 
     //each tim channel defined will be set up in pwm mode
     uint32_t pwm_mask = ((0b110 << TIM_CCMR1_OC1M_Pos) | TIM_CCMR1_OC1PE); //do tim2_ch1 first
     uint32_t ccer_mask = TIM_CCER_CC1E;
-    //good thing about each tim using ch1 is that the mask can be reused
+    //all but pa7 uses channel 1 for their tim
     cfgr_tim_ccmr1(TIM2, pwm_mask, ccer_mask);
     cfgr_tim_ccmr1(TIM4, pwm_mask, ccer_mask);
-    cfgr_tim_ccmr1(TIM16, pwm_mask, ccer_mask);
-    cfgr_tim_ccmr1(TIM17, pwm_mask, ccer_mask);
+    cfgr_tim_ccmr1(TIM3, pwm_mask, ccer_mask);
+
+    //configure channel 2 for tim3
+    pwm_mask = ((0b110 << TIM_CCMR1_OC2M_Pos) | TIM_CCMR1_OC2PE);
+    ccer_mask = TIM_CCER_CC2E;
+    cfgr_tim_ccmr1(TIM3, pwm_mask, ccer_mask);
 
     //set up the initial duty cycle and frequency
     uint32_t freq = 1000; //let's do 1khz initially
 
-    setup_pwm_ch1(freq, 50.0f); //does each tim to keep the code less bulky in main
-
+    float target_percent = MAX_DC_PERCENT;
+    float dc_step = -DC_STEP;
+    setup_pwm_ch1(freq, target_percent); //does each tim to keep the code less bulky in main
     while (1){
-        /* code */
+        target_percent += dc_step;
+
+        //odulate between the min and max duty cycle percents
+        if(target_percent < MIN_DC_PERCENT){
+            dc_step = DC_STEP;
+            target_percent = MIN_DC_PERCENT;
+        }else if(target_percent >= MAX_DC_PERCENT){
+            dc_step = -DC_STEP;
+            target_percent = MAX_DC_PERCENT;
+        }
+
+        //update the pwm
+        TIM2->CCR1 = update_pwm_dutyCycle(TIM2, target_percent);
+        TIM4->CCR1 = update_pwm_dutyCycle(TIM4, target_percent);
+        TIM3->CCR1 = update_pwm_dutyCycle(TIM3, target_percent);
+        TIM3->CCR2 = update_pwm_dutyCycle(TIM3, target_percent);
+        delay_ms(TIM6, 10);
     }
-    
 }
