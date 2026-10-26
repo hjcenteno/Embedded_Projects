@@ -94,11 +94,10 @@ int main(void){
     //all but pa7 uses channel 1 for their tim
     cfgr_tim_ccmr1(TIM2, pwm_mask, ccer_mask);
     cfgr_tim_ccmr1(TIM4, pwm_mask, ccer_mask);
-    cfgr_tim_ccmr1(TIM3, pwm_mask, ccer_mask);
 
     //configure channel 2 for tim3
-    pwm_mask = ((0b110 << TIM_CCMR1_OC2M_Pos) | TIM_CCMR1_OC2PE);
-    ccer_mask = TIM_CCER_CC2E;
+    pwm_mask = ((0b110 << TIM_CCMR1_OC1M_Pos) | TIM_CCMR1_OC1PE) | ((0b110 << TIM_CCMR1_OC2M_Pos) | TIM_CCMR1_OC2PE);
+    ccer_mask = TIM_CCER_CC1E | TIM_CCER_CC2E;
     cfgr_tim_ccmr1(TIM3, pwm_mask, ccer_mask);
 
     //set up the initial duty cycle and frequency
