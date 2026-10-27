@@ -173,6 +173,11 @@ typedef struct gyrof_t{
     float z;
 }gyrof_t;
 
+typedef struct orientation_t{
+    float roll;
+    float pitch;
+}orientation_t;
+
 //functions to do stuff to the mpu6050 sensor
 int purify_read_lsb(raw_mpu6050_t *mpu6050); //call to push the data read to make it into least significant byte format
 int zero_out_mpu6050(mpu6050_ptr *mpu6050);

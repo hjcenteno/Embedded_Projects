@@ -21,8 +21,14 @@
 
 #include "system_time/timx_utils.h"
 #include "sensors/mpu6050_driver.h"
+#include "i2c_driver/i2c_driver.h"
 
 #define DC_STEP (1.0f)
+
+typedef enum mainState_t{
+    readSensorEn = 0, //read the sensor first, transition only on success
+    readData = 1 //read the data
+}mainState_t;
 
 void init_pwm_pins(void){
     //initiates the pins for pwm
@@ -73,11 +79,44 @@ void setup_pwm_ch1(uint32_t targetHz, float initialDC){
     TIM3->CCR2 = update_pwm_dutyCycle(TIM3, initialDC);
 }
 
-int main(void){
-    init_pwm_pins();
+//returns true if and only if the whoAmI register gave 0x68 and the sensor woke up
+bool init_mpu6050(void){
+    //check if we can read the whoAmI register
+    uint8_t whoAmi = 0;
+    if(i2c_master_read(mpu6050_saddr_0, MPU6050_WHO_AM_I_REG, &whoAmi, sizeof(whoAmi)) == 0){
+        if(whoAmi != 0x68){
+            return false;
+        }
+    }
 
+    //check if we can wake up the sensor
+    uint8_t pwr_mgmt_mask = 0 & (~MPU6050_SLEEP_BIT); //sensor is initially in sleep mode (sleep bit = 1)
+    if(i2c_master_write(mpu6050_saddr_0, MPU6050_PWR_MGMT_1, &pwr_mgmt_mask, sizeof(pwr_mgmt_mask)) != 0){
+        return false; //failed write
+    }
+
+    return true;
+}
+
+int main(void){
+    //initial setups
     activate_SWS_RCC_HSE();
+    init_pwm_pins();
+    init_i2c(fast);
     
+    //mpu6050 setup
+    bool readSensor = init_mpu6050();
+    raw_mpu6050_t rawReadings;
+    cal_mpu6050_t calReadings;
+    mpu6050_ptr mainSensor = {
+        .raw_ptr = &rawReadings,
+        .cal_ptr = &calReadings
+    };
+    zero_out_mpu6050(&mainSensor);
+
+    orienta
+    
+
     //activate the tims needed, tim6 will act as a basic timer
     RCC->APB1ENR1 |= (
         RCC_APB1ENR1_TIM2EN | RCC_APB1ENR1_TIM4EN | 
@@ -103,26 +142,45 @@ int main(void){
     //set up the initial duty cycle and frequency
     uint32_t freq = 1000; //let's do 1khz initially
 
-    float target_percent = MAX_DC_PERCENT;
+    float target_percent = 50;
     float dc_step = -DC_STEP;
     setup_pwm_ch1(freq, target_percent); //does each tim to keep the code less bulky in main
-    while (1){
-        target_percent += dc_step;
-
-        //odulate between the min and max duty cycle percents
-        if(target_percent < MIN_DC_PERCENT){
-            dc_step = DC_STEP;
-            target_percent = MIN_DC_PERCENT;
-        }else if(target_percent >= MAX_DC_PERCENT){
-            dc_step = -DC_STEP;
-            target_percent = MAX_DC_PERCENT;
+    
+    uint32_t startTime = 0; //track time between data reads of the sensor
+    while(1){
+        //see if we can read the sensor
+        if(!readSensor){
+            //recover the sensor if not
+            readSensor = init_mpu6050();
+            delay_ms(TIM6, 500);
+            startTime = getTime(TIM6);
+            continue;
         }
 
-        //update the pwm
-        TIM2->CCR1 = update_pwm_dutyCycle(TIM2, target_percent);
-        TIM4->CCR1 = update_pwm_dutyCycle(TIM4, target_percent);
-        TIM3->CCR1 = update_pwm_dutyCycle(TIM3, target_percent);
-        TIM3->CCR2 = update_pwm_dutyCycle(TIM3, target_percent);
-        delay_ms(TIM6, 10);
+        //read the accelerometer and gyrometer data
+        if(i2c_master_read(mpu6050_saddr_0, MPU6050_DATA_START_ADDR, PTR_TO_BYTES(mainSensor.raw_ptr), sizeof(*mainSensor.raw_ptr)) != 0){ //assume it failed
+            readSensor = false;
+            recover_i2c();
+            continue;
+        }
+        purify_read_lsb(mainSensor.raw_ptr); //the data is transmitted as MSB
+        
+        //calibrate the data
+        mainSensor.cal_ptr->accX / MPU6050_ACC_SENSITIVITY_0; //debating whether I should include these lines in the function call or not
+        mainSensor.cal_ptr->accY / MPU6050_ACC_SENSITIVITY_0;
+        mainSensor.cal_ptr->accZ / MPU6050_ACC_SENSITIVITY_0;
+        mainSensor.cal_ptr->gyroX / MPU6050_GYRO_SENSITIVITY_0;
+        mainSensor.cal_ptr->gyroY / MPU6050_GYRO_SENSITIVITY_0;
+        mainSensor.cal_ptr->gyroZ / MPU6050_GYRO_SENSITIVITY_0;
+        applyFullCalibrations(mainSensor.cal_ptr);
+        uint32_t currentTime = getTime(TIM6); //time it took to read the data plus any setbacks
+
+        //get the roll and pitch angles
+        float dt = currentTime - startTime;
+
+
+        startTime = currentTime;
     }
+
+    return 0;
 }
