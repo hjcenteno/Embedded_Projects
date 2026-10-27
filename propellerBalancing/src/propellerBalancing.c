@@ -23,7 +23,7 @@
 #include "sensors/mpu6050_driver.h"
 #include "i2c_driver/i2c_driver.h"
 
-#define DC_STEP (1.0f)
+#define DC_STEP (0.01f)
 
 typedef enum mainState_t{
     readSensorEn = 0, //read the sensor first, transition only on success
@@ -98,6 +98,9 @@ bool init_mpu6050(void){
     return true;
 }
 
+/* This function handles the PID implementation for determining how each
+ * motor should react towards the roll and pitch angle by writing to the necessary channels.
+ */
 void handle_PID_correction(float roll, float pitch){
     float corrections[4] = {0.0f};
 
@@ -155,6 +158,7 @@ int main(void){
     uint32_t freq = 1000; //let's do 1khz initially
 
     float target_percent = 50;
+    float dc_step = -DC_STEP;
     setup_pwm_ch1(freq, target_percent); //does each tim to keep the code less bulky in main
     
     while(1){
@@ -191,7 +195,23 @@ int main(void){
         angles.pitch = calculate_pitch(mainSensor.cal_ptr, angles.pitch, dt);
 
         //determine how the motors should react to correct the orientation
-        handle_PID_correction(angles.roll, angles.pitch);
+        // handle_PID_correction(angles.roll, angles.pitch);
+        target_percent += dc_step;
+        
+        //dim to 0% then increase brightness after that
+        if(target_percent < MIN_DC_PERCENT){
+            dc_step = DC_STEP;
+            target_percent = MIN_DC_PERCENT;
+        }else if(target_percent >= MAX_DC_PERCENT){
+            dc_step = -DC_STEP;
+            target_percent = MAX_DC_PERCENT;
+        }
+
+        TIM2->CCR1 = update_pwm_dutyCycle(TIM2, target_percent);
+        TIM4->CCR1 = update_pwm_dutyCycle(TIM4, target_percent);
+        TIM3->CCR1 = update_pwm_dutyCycle(TIM3, target_percent);
+        TIM3->CCR2 = update_pwm_dutyCycle(TIM3, target_percent);
+        delay_ms(TIM3, 10);
     }
 
     return 0;
