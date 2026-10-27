@@ -98,6 +98,16 @@ bool init_mpu6050(void){
     return true;
 }
 
+void handle_PID_correction(float roll, float pitch){
+    float corrections[4] = {0.0f};
+
+    //set the duty cycle in each channel per the PID corrections
+    TIM2->CCR1 = update_pwm_dutyCycle(TIM2, corrections[0]);
+    TIM4->CCR1 = update_pwm_dutyCycle(TIM4, corrections[1]);
+    TIM3->CCR1 = update_pwm_dutyCycle(TIM3, corrections[2]);
+    TIM3->CCR2 = update_pwm_dutyCycle(TIM3, corrections[3]);
+}
+
 int main(void){
     //initial setups
     activate_SWS_RCC_HSE();
@@ -114,8 +124,10 @@ int main(void){
     };
     zero_out_mpu6050(&mainSensor);
 
-    orienta
-    
+    orientation_t angles = {
+        .roll = 0.0f,
+        .pitch = 0.0f
+    };
 
     //activate the tims needed, tim6 will act as a basic timer
     RCC->APB1ENR1 |= (
@@ -143,17 +155,15 @@ int main(void){
     uint32_t freq = 1000; //let's do 1khz initially
 
     float target_percent = 50;
-    float dc_step = -DC_STEP;
     setup_pwm_ch1(freq, target_percent); //does each tim to keep the code less bulky in main
     
-    uint32_t startTime = 0; //track time between data reads of the sensor
     while(1){
+        uint32_t startTime = getTime(TIM6); //track time between data reads of the sensor
         //see if we can read the sensor
         if(!readSensor){
             //recover the sensor if not
             readSensor = init_mpu6050();
             delay_ms(TIM6, 500);
-            startTime = getTime(TIM6);
             continue;
         }
 
@@ -166,20 +176,22 @@ int main(void){
         purify_read_lsb(mainSensor.raw_ptr); //the data is transmitted as MSB
         
         //calibrate the data
-        mainSensor.cal_ptr->accX / MPU6050_ACC_SENSITIVITY_0; //debating whether I should include these lines in the function call or not
-        mainSensor.cal_ptr->accY / MPU6050_ACC_SENSITIVITY_0;
-        mainSensor.cal_ptr->accZ / MPU6050_ACC_SENSITIVITY_0;
-        mainSensor.cal_ptr->gyroX / MPU6050_GYRO_SENSITIVITY_0;
-        mainSensor.cal_ptr->gyroY / MPU6050_GYRO_SENSITIVITY_0;
-        mainSensor.cal_ptr->gyroZ / MPU6050_GYRO_SENSITIVITY_0;
+        mainSensor.cal_ptr->accX = mainSensor.raw_ptr->accX / MPU6050_ACC_SENSITIVITY_0; //debating whether I should include these lines in the function call or not
+        mainSensor.cal_ptr->accY = mainSensor.raw_ptr->accY / MPU6050_ACC_SENSITIVITY_0;
+        mainSensor.cal_ptr->accZ = mainSensor.raw_ptr->accZ / MPU6050_ACC_SENSITIVITY_0;
+        mainSensor.cal_ptr->gyroX = mainSensor.raw_ptr->gyroX / MPU6050_GYRO_SENSITIVITY_0;
+        mainSensor.cal_ptr->gyroY = mainSensor.raw_ptr->gyroY / MPU6050_GYRO_SENSITIVITY_0;
+        mainSensor.cal_ptr->gyroZ = mainSensor.raw_ptr->gyroZ / MPU6050_GYRO_SENSITIVITY_0;
         applyFullCalibrations(mainSensor.cal_ptr);
         uint32_t currentTime = getTime(TIM6); //time it took to read the data plus any setbacks
 
         //get the roll and pitch angles
-        float dt = currentTime - startTime;
+        float dt = (float)(currentTime - startTime) * MICRO_TO_BASE;
+        angles.roll = calculate_roll(mainSensor.cal_ptr, angles.roll, dt);
+        angles.pitch = calculate_pitch(mainSensor.cal_ptr, angles.pitch, dt);
 
-
-        startTime = currentTime;
+        //determine how the motors should react to correct the orientation
+        handle_PID_correction(angles.roll, angles.pitch);
     }
 
     return 0;
