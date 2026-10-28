@@ -23,7 +23,12 @@
 #include "sensors/mpu6050_driver.h"
 #include "i2c_driver/i2c_driver.h"
 
-#define DC_STEP (0.01f)
+//PID parameters: values are played aroudn with until something stuck
+#define KP (10.0f)
+#define KI (1.5f)
+#define KD (3.1f)
+#define UPPER_KI_LIMIT (10.0f)
+#define LOWER_KI_LIMIT (-10.0f)
 
 typedef enum mainState_t{
     readSensorEn = 0, //read the sensor first, transition only on success
@@ -32,10 +37,10 @@ typedef enum mainState_t{
 
 void init_pwm_pins(void){
     //initiates the pins for pwm
-    //d13/pa5 => tim2_ch1 af1
-    //d12/pa6 => tim3_ch1 af2
-    //d11/pa7 => tim3_ch2 af2
-    //d10/pb6 => tim4_ch1 af2
+    //d13/pa5 => tim2_ch1 af1 motor 1
+    //d12/pa6 => tim3_ch1 af2 motor 2
+    //d11/pa7 => tim3_ch2 af2 motor 3
+    //d10/pb6 => tim4_ch1 af2 motor 4
     RCC->AHB2ENR |= (RCC_AHB2ENR_GPIOAEN | RCC_AHB2ENR_GPIOBEN); //turn on the peripheral clock
     
     //clear the pins for af mode
@@ -98,18 +103,27 @@ bool init_mpu6050(void){
     return true;
 }
 
-/* This function handles the PID implementation for determining how each
- * motor should react towards the roll and pitch angle by writing to the necessary channels.
- */
-void handle_PID_correction(float roll, float pitch){
-    float corrections[4] = {0.0f};
+/* Thsese functions implement the PID specified in the readme in the project directory */
+float calculate_pid(const float error, float *errorIntegral, const float gyroRate, const float dt){
+    //calculate each term then add them together
+    float p = KP * error;
+    
+    *errorIntegral += error * dt;
+    //clamp the integral
+    if(*errorIntegral < LOWER_KI_LIMIT){
+        *errorIntegral = LOWER_KI_LIMIT;
+    }
 
-    //set the duty cycle in each channel per the PID corrections
-    TIM2->CCR1 = update_pwm_dutyCycle(TIM2, corrections[0]);
-    TIM4->CCR1 = update_pwm_dutyCycle(TIM4, corrections[1]);
-    TIM3->CCR1 = update_pwm_dutyCycle(TIM3, corrections[2]);
-    TIM3->CCR2 = update_pwm_dutyCycle(TIM3, corrections[3]);
+    if(*errorIntegral > UPPER_KI_LIMIT){
+        *errorIntegral = UPPER_KI_LIMIT;
+    }
+
+    float i = KI * (*errorIntegral); //get the absolute value of the area of the error to make the math simpler
+    float d = KD * gyroRate;
+
+    return p + i - d;
 }
+
 
 int main(void){
     //initial setups
@@ -158,16 +172,18 @@ int main(void){
     uint32_t freq = 1000; //let's do 1khz initially
 
     float target_percent = 50;
-    float dc_step = -DC_STEP;
     setup_pwm_ch1(freq, target_percent); //does each tim to keep the code less bulky in main
-    
+    float roll_errorIntegral = 0.0f;
+    float pitch_errorIntegral = 0.0f;
+
+    uint32_t startTime = 0; //track time between data reads of the sensor
     while(1){
-        uint32_t startTime = getTime(TIM6); //track time between data reads of the sensor
         //see if we can read the sensor
         if(!readSensor){
             //recover the sensor if not
             readSensor = init_mpu6050();
             delay_ms(TIM6, 500);
+            startTime = getTime(TIM6);
             continue;
         }
 
@@ -190,28 +206,24 @@ int main(void){
         uint32_t currentTime = getTime(TIM6); //time it took to read the data plus any setbacks
 
         //get the roll and pitch angles
-        float dt = (float)(currentTime - startTime) * MICRO_TO_BASE;
+        float dt = (float)((currentTime - startTime) & MAX_TIME_16) * MICRO_TO_BASE;
         angles.roll = calculate_roll(mainSensor.cal_ptr, angles.roll, dt);
         angles.pitch = calculate_pitch(mainSensor.cal_ptr, angles.pitch, dt);
 
         //determine how the motors should react to correct the orientation
-        // handle_PID_correction(angles.roll, angles.pitch);
-        target_percent += dc_step;
-        
-        //dim to 0% then increase brightness after that
-        if(target_percent < MIN_DC_PERCENT){
-            dc_step = DC_STEP;
-            target_percent = MIN_DC_PERCENT;
-        }else if(target_percent >= MAX_DC_PERCENT){
-            dc_step = -DC_STEP;
-            target_percent = MAX_DC_PERCENT;
-        }
+        //since the target roll and pitch angles are both 0 rads/degrees, the error is {-roll, -pitch}
 
-        TIM2->CCR1 = update_pwm_dutyCycle(TIM2, target_percent);
-        TIM4->CCR1 = update_pwm_dutyCycle(TIM4, target_percent);
-        TIM3->CCR1 = update_pwm_dutyCycle(TIM3, target_percent);
-        TIM3->CCR2 = update_pwm_dutyCycle(TIM3, target_percent);
-        delay_ms(TIM3, 10);
+        float pidRoll = calculate_pid(-angles.roll, &roll_errorIntegral, mainSensor.cal_ptr->gyroX, dt);
+        float pidPitch = calculate_pid(-angles.pitch, &pitch_errorIntegral, mainSensor.cal_ptr->gyroY, dt);
+        
+        //imagining the y axis as the pitch and the x axis as the roll, each quadrant then defines the sign for each motor's axises
+        TIM2->CCR1 = update_pwm_dutyCycle(TIM2, (target_percent - pidRoll + pidPitch)); //motor 1
+        TIM4->CCR1 = update_pwm_dutyCycle(TIM4, (target_percent + pidRoll + pidPitch)); //motor 2
+        TIM3->CCR1 = update_pwm_dutyCycle(TIM3, (target_percent - pidRoll - pidPitch)); //motor 3
+        TIM3->CCR2 = update_pwm_dutyCycle(TIM3, (target_percent + pidRoll - pidPitch)); //motor 4
+
+        delay_us(TIM6, 500);
+        startTime = currentTime;
     }
 
     return 0;
