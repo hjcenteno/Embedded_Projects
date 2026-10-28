@@ -196,12 +196,12 @@ int main(void){
         purify_read_lsb(mainSensor.raw_ptr); //the data is transmitted as MSB
         
         //calibrate the data
-        mainSensor.cal_ptr->accX = mainSensor.raw_ptr->accX / MPU6050_ACC_SENSITIVITY_0; //debating whether I should include these lines in the function call or not
-        mainSensor.cal_ptr->accY = mainSensor.raw_ptr->accY / MPU6050_ACC_SENSITIVITY_0;
-        mainSensor.cal_ptr->accZ = mainSensor.raw_ptr->accZ / MPU6050_ACC_SENSITIVITY_0;
-        mainSensor.cal_ptr->gyroX = mainSensor.raw_ptr->gyroX / MPU6050_GYRO_SENSITIVITY_0;
-        mainSensor.cal_ptr->gyroY = mainSensor.raw_ptr->gyroY / MPU6050_GYRO_SENSITIVITY_0;
-        mainSensor.cal_ptr->gyroZ = mainSensor.raw_ptr->gyroZ / MPU6050_GYRO_SENSITIVITY_0;
+        mainSensor.cal_ptr->accX = (float)mainSensor.raw_ptr->accX / MPU6050_ACC_SENSITIVITY_0; //debating whether I should include these lines in the function call or not
+        mainSensor.cal_ptr->accY = (float)mainSensor.raw_ptr->accY / MPU6050_ACC_SENSITIVITY_0;
+        mainSensor.cal_ptr->accZ = (float)mainSensor.raw_ptr->accZ / MPU6050_ACC_SENSITIVITY_0;
+        mainSensor.cal_ptr->gyroX = (float)mainSensor.raw_ptr->gyroX / MPU6050_GYRO_SENSITIVITY_0;
+        mainSensor.cal_ptr->gyroY = (float)mainSensor.raw_ptr->gyroY / MPU6050_GYRO_SENSITIVITY_0;
+        mainSensor.cal_ptr->gyroZ = (float)mainSensor.raw_ptr->gyroZ / MPU6050_GYRO_SENSITIVITY_0;
         applyFullCalibrations(mainSensor.cal_ptr);
         uint32_t currentTime = getTime(TIM6); //time it took to read the data plus any setbacks
 
