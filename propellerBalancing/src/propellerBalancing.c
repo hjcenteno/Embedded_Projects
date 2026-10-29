@@ -24,9 +24,9 @@
 #include "i2c_driver/i2c_driver.h"
 
 //PID parameters: values are played aroudn with until something stuck
-#define KP (10.0f)
-#define KI (1.5f)
-#define KD (3.1f)
+#define KP (85.0f)
+#define KI (2.5f)
+#define KD (15.0f)
 #define UPPER_KI_LIMIT (10.0f)
 #define LOWER_KI_LIMIT (-10.0f)
 
@@ -119,7 +119,7 @@ float calculate_pid(const float error, float *errorIntegral, const float gyroRat
     }
 
     float i = KI * (*errorIntegral); //get the absolute value of the area of the error to make the math simpler
-    float d = KD * gyroRate;
+    float d = KD * DEGREES_TO_RADIAN(gyroRate);
 
     return p + i - d;
 }
@@ -218,9 +218,9 @@ int main(void){
         
         //imagining the y axis as the pitch and the x axis as the roll, each quadrant then defines the sign for each motor's axises
         TIM2->CCR1 = update_pwm_dutyCycle(TIM2, (target_percent - pidRoll + pidPitch)); //motor 1
-        TIM4->CCR1 = update_pwm_dutyCycle(TIM4, (target_percent + pidRoll + pidPitch)); //motor 2
-        TIM3->CCR1 = update_pwm_dutyCycle(TIM3, (target_percent - pidRoll - pidPitch)); //motor 3
-        TIM3->CCR2 = update_pwm_dutyCycle(TIM3, (target_percent + pidRoll - pidPitch)); //motor 4
+        TIM3->CCR1 = update_pwm_dutyCycle(TIM3, (target_percent + pidRoll + pidPitch)); //motor 3
+        TIM3->CCR2 = update_pwm_dutyCycle(TIM3, (target_percent - pidRoll - pidPitch)); //motor 4
+        TIM4->CCR1 = update_pwm_dutyCycle(TIM4, (target_percent + pidRoll - pidPitch)); //motor 2
 
         delay_us(TIM6, 500);
         startTime = currentTime;
