@@ -7,8 +7,8 @@
 
     Components | Pin | peripheral
         s1 | D3 | pb3
-        s2 | D4 | pb4
-        key | D5 | pb5
+        s2 | D5 | pb4
+        key | D4 | pb5
 */
 
 #include "uart_driver/lpuart_driver.h"
@@ -66,7 +66,7 @@ void init_gpioPins(void){
 }
 
 //for each transition, assume a bad input unless proven otherwise
-KnobStates transitionFrom_idle(b_idr){
+KnobStates transitionFrom_idle(uint32_t b_idr){
     //figure out how idle transitions to the other states
 
     //idle to invalid: key(s1 + s2)
@@ -103,7 +103,7 @@ KnobStates transitionFrom_idle(b_idr){
     return invalid; //returning invalid since the other states have those specific transition conditions
 }
 
-KnobStates transitionFrom_invalid(b_idr){
+KnobStates transitionFrom_invalid(uint32_t b_idr){
     //figure out how invalid transitions to the other states
 
     //invalid can only transition to idle
@@ -114,7 +114,7 @@ KnobStates transitionFrom_invalid(b_idr){
     return invalid;
 }
 
-KnobStates transitionFrom_pressed(b_idr){
+KnobStates transitionFrom_pressed(uint32_t b_idr){
     //figure out how invalid pressed to the other states
 
     //pressed to idle: !key(!s1(!s2)))
@@ -135,13 +135,64 @@ KnobStates transitionFrom_pressed(b_idr){
     return invalid;
 }
 
-KnobStates transitionFrom_cw(b_idr){
+KnobStates transitionFrom_cw(uint32_t b_idr){
     //figure out how cw transitions to the other states
+
+    //cw to idle: !key(!s1)(!s2)
+    if(!(b_idr & KEY_MASK) && !(b_idr & S1_MASK) && (!(b_idr & S2_MASK))){
+        return idle;
+    }
+
+    //cw to invalid: key
+    if(b_idr & KEY_MASK){
+        return invalid;
+    }
+
+    //cw to ccw: s2(!prevS1)
+    if((b_idr & S2_MASK) && (!knobMachine.prevS1)){
+        return ccw;
+    }
+
+    //cw to cw: s1(!s2) + !s1(s2)(prevs1)
+    if(
+        ((b_idr & S1_MASK) && !(b_idr & S2_MASK)) || //s1(!s2)
+        (!(b_idr & S1_MASK) && (b_idr & S2_MASK) && knobMachine.prevS1)
+    ){
+        return cw;
+    }
+
     return invalid;
 }
 
-KnobStates transitionFrom_ccw(b_idr){
+KnobStates transitionFrom_ccw(uint32_t b_idr){
     //figure out how ccw transitions to the other states
+
+    //ccw to idle: !key(!s1)(!s2)
+    if(!(b_idr & KEY_MASK) && !(b_idr & S1_MASK) && (!(b_idr & S2_MASK))){
+        return idle;
+    }
+
+    //ccw to invalid: key
+    if(b_idr & KEY_MASK){
+        return invalid;
+    }
+
+    //ccw to cw: s1(s2) + !s2(s1)(prevS1)
+    if(
+        ((b_idr & S1_MASK) && (b_idr & S2_MASK)) ||
+        (!(b_idr & S2_MASK) && (b_idr & S1_MASK) && knobMachine.prevS1)
+    ){
+        return cw;
+    }
+
+    //ccw to ccw: s2(!s1) + s2(!prevS1)
+    if(
+        ((b_idr & S2_MASK) && !(b_idr & S1_MASK)) ||
+        ((b_idr & S2_MASK) && !knobMachine.prevS1)
+    ){
+       return ccw; 
+    }
+
     return invalid;
 }
 
@@ -184,6 +235,10 @@ int main(void){
                 break;
         }
 
+        if(nextState == knobMachine.q){
+            continue;
+        }
+
         //update the knob machines
         knobMachine.q = nextState;
         knobMachine.prevS1 = b_idr & S1_MASK; //pins use a pull-up for logic low, so a 0 on a pin means its an input
@@ -196,7 +251,7 @@ int main(void){
             case pressed:
                 //clamp the delta between a min and max
                 kt.delta += DELTA_STEP;
-                CLAMP(MIN_DELTA, kt.delta, MAX_DELTA); //kinda like the arr in tim, but hopefully goes to min_delta and increments from there
+                kt.delta = CLAMP(MIN_DELTA, kt.delta, MAX_DELTA); //kinda like the arr in tim, but hopefully goes to min_delta and increments from there
                 break;
             case cw:
                 //increment on cw
