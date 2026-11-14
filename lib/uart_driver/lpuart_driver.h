@@ -8,10 +8,7 @@
 #ifndef LPUART_DRIVER_H
 #define LPUART_DRIVER_H
 
-#include "stm32g474xx.h"
-#include <inttypes.h>
-#include <stdbool.h>
-#include <stdlib.h>
+#include "common_includes/common_includes.h"
 
 #define MAX_RB_SIZE 255
 #define MAX_RB_LENGTH 80

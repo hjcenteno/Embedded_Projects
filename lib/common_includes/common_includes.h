@@ -14,5 +14,9 @@
 
 #define TO_BYTE_ARRAY(X) ((uint8_t *)&X) //convert x into an array of bytes
 #define PTR_TO_BYTES(X) ((uint8_t *)X) //read what x points to as an array of bytes
+#define MAX(X, Y) (((X) >= (Y)) ? (X) : (Y)) 
+#define MIN(X, Y) (((X) <= (Y)) ? (X) : (Y))
+#define CLAMP(X, Y, Z) (MIN(MAX(X, Y), Z)) //X <= Y <= Z, so ensure Y is between X and Z inclusive
+
 
 #endif
