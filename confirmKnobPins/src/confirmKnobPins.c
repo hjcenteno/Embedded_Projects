@@ -127,11 +127,6 @@ KnobStates transitionFrom_pressed(uint32_t b_idr){
         return invalid;
     }
 
-    //pressed to pressed: key(!s1(!s2)))
-    if((b_idr & KEY_MASK) && !(b_idr & S1_MASK) && (!(b_idr & S2_MASK))){
-        return pressed;
-    }
-
     return invalid;
 }
 
@@ -235,13 +230,10 @@ int main(void){
                 break;
         }
 
-        if(nextState == knobMachine.q){
-            continue;
-        }
-
         //update the knob machines
         knobMachine.q = nextState;
         knobMachine.prevS1 = b_idr & S1_MASK; //pins use a pull-up for logic low, so a 0 on a pin means its an input
+        
 
         //handle the state behavior
         switch(nextState){
@@ -252,6 +244,11 @@ int main(void){
                 //clamp the delta between a min and max
                 kt.delta += DELTA_STEP;
                 kt.delta = CLAMP(MIN_DELTA, kt.delta, MAX_DELTA); //kinda like the arr in tim, but hopefully goes to min_delta and increments from there
+                
+                if((kt.delta == MIN_DELTA) || (kt.delta == MAX_DELTA)){
+                    kt.delta *= -1;
+                }
+
                 break;
             case cw:
                 //increment on cw
@@ -264,8 +261,10 @@ int main(void){
             default:
                 break;
         }
+
+        // prevState = nextState;
         client_transmit(TO_BYTE_ARRAY(kt), sizeof(kt));
-        delay_us(500);
+        delay_us(1500);
     }
 
     return 0;
