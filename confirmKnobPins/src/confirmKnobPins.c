@@ -14,6 +14,14 @@
 #include "uart_driver/lpuart_driver.h"
 #include "system_time/mcu_time.h" //already has tim2 set up
 
+#define MIN_DELTA (-1.0f)
+#define MAX_DELTA (1.0f)
+#define DELTA_STEP (0.1f)
+
+#define KEY_MASK (GPIO_IDR_ID5)
+#define S1_MASK (GPIO_IDR_ID3)
+#define S2_MASK (GPIO_IDR_ID4)
+
 /*
     This will hold the inputs for the state machine that describes how to differentiate
     between the behaviors of the knob. The state machine will act as a d flip flop with 
@@ -44,6 +52,11 @@ static struct KnobMachine{
     KnobStates q;
 }knobMachine;
 
+static struct KnobTransmission{
+    float rotationAmt;
+    float delta;
+} kt;
+
 void init_gpioPins(void){
     RCC->AHB2ENR |= RCC_AHB2ENR_GPIOBEN;
 
@@ -51,6 +64,87 @@ void init_gpioPins(void){
     GPIOB->MODER &= ~(GPIO_MODER_MODE3 | GPIO_MODER_MODE4 | GPIO_MODER_MODE5);
     GPIOB->PUPDR &= ~(GPIO_PUPDR_PUPD3 | GPIO_PUPDR_PUPD4 | GPIO_PUPDR_PUPD5);
 }
+
+//for each transition, assume a bad input unless proven otherwise
+KnobStates transitionFrom_idle(b_idr){
+    //figure out how idle transitions to the other states
+
+    //idle to invalid: key(s1 + s2)
+    if((b_idr & KEY_MASK) && (b_idr & (S1_MASK | S2_MASK))){
+        return invalid;
+    }
+    
+    //idle to pressed: key(!s1(!s2)))
+    if((b_idr & KEY_MASK) && (!(b_idr & S1_MASK) && !(b_idr & S2_MASK))){
+        return pressed;
+    }
+
+    //idle to cw: prevS1(S1) + s1(!s2)
+    if(
+        (knobMachine.prevS1 && (b_idr & S1_MASK)) || //prevS1(S1)
+        ((b_idr & S1_MASK) && !(b_idr & S2_MASK))
+    ){
+        return cw;
+    }
+
+    //idle to ccw: !prevS1(s2) + !s1(s2)
+    if(
+        (!knobMachine.prevS1 && (b_idr & S2_MASK)) || //!prevS1(s2)
+        (!(b_idr & S1_MASK) && (b_idr & S2_MASK))
+    ){
+        return ccw;
+    }
+
+    //idle to idle: !key(!s1)(!s2)
+    if(!(b_idr & KEY_MASK) && !(b_idr & S1_MASK) && (!(b_idr & S2_MASK))){
+        return idle;
+    }
+
+    return invalid; //returning invalid since the other states have those specific transition conditions
+}
+
+KnobStates transitionFrom_invalid(b_idr){
+    //figure out how invalid transitions to the other states
+
+    //invalid can only transition to idle
+    if(!(b_idr & KEY_MASK) && !(b_idr & S1_MASK) && (!(b_idr & S2_MASK))){
+        return idle;
+    }
+
+    return invalid;
+}
+
+KnobStates transitionFrom_pressed(b_idr){
+    //figure out how invalid pressed to the other states
+
+    //pressed to idle: !key(!s1(!s2)))
+    if(!(b_idr & KEY_MASK) && !(b_idr & S1_MASK) && (!(b_idr & S2_MASK))){
+        return idle;
+    }
+
+    //pressed to invalid: s1 + s2
+    if((b_idr & S1_MASK) || (b_idr & S2_MASK)){
+        return invalid;
+    }
+
+    //pressed to pressed: key(!s1(!s2)))
+    if((b_idr & KEY_MASK) && !(b_idr & S1_MASK) && (!(b_idr & S2_MASK))){
+        return pressed;
+    }
+
+    return invalid;
+}
+
+KnobStates transitionFrom_cw(b_idr){
+    //figure out how cw transitions to the other states
+    return invalid;
+}
+
+KnobStates transitionFrom_ccw(b_idr){
+    //figure out how ccw transitions to the other states
+    return invalid;
+}
+
 
 int main(void){
     init_tim2();
@@ -61,9 +155,9 @@ int main(void){
     knobMachine.prevS1 = 0;
     knobMachine.q = idle;
     
-    float rotationAmt = 0; //amount changed by the rotation of the knob
-    float delta = 0; //the quantity that rotationAmt changes by
-
+    kt.rotationAmt = 0; //amount changed by the rotation of the knob
+    kt.delta = DELTA_STEP; //the quantity that rotationAmt changes by
+    
     while (1){
         //since the pins are pull-ups, a 0 reads that its an input, so flipping the idr will make the bits read 1 on input
         uint32_t b_idr = ~GPIOB->IDR; //get a note of the idr
@@ -92,7 +186,7 @@ int main(void){
 
         //update the knob machines
         knobMachine.q = nextState;
-        knobMachine.prevS1 = b_idr & GPIO_IDR_ID3; //pins use a pull-up for logic low, so a 0 on a pin means its an input
+        knobMachine.prevS1 = b_idr & S1_MASK; //pins use a pull-up for logic low, so a 0 on a pin means its an input
 
         //handle the state behavior
         switch(nextState){
@@ -100,19 +194,23 @@ int main(void){
             case invalid:
                 continue; //do nothing
             case pressed:
-                nextState = transitionFrom_pressed(b_idr);
+                //clamp the delta between a min and max
+                kt.delta += DELTA_STEP;
+                CLAMP(MIN_DELTA, kt.delta, MAX_DELTA); //kinda like the arr in tim, but hopefully goes to min_delta and increments from there
                 break;
             case cw:
-                nextState = transitionFrom_cw(b_idr);
+                //increment on cw
+                kt.rotationAmt += kt.delta; 
                 break;
             case ccw:
-                nextState = transitionFrom_ccw(b_idr);
+                //decrememt on ccw
+                kt.rotationAmt -= kt.delta;
                 break;
             default:
                 break;
         }
-
-        //output
+        client_transmit(TO_BYTE_ARRAY(kt), sizeof(kt));
+        delay_us(500);
     }
 
     return 0;
