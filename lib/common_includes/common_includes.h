@@ -17,6 +17,8 @@
 #define MAX(X, Y) (((X) >= (Y)) ? (X) : (Y)) 
 #define MIN(X, Y) (((X) <= (Y)) ? (X) : (Y))
 #define CLAMP(X, Y, Z) (MIN(MAX(X, Y), Z)) //X <= Y <= Z, so ensure Y is between X and Z inclusive
-
+#define SET_PIN(pin, pos) ((pin) << (pos))
+#define GET_PIN_POS(bitMask, pinMask, pos) (((bitMask) & (pinMask)) >> (pos))
+#define GET_PIN_BIT(bitMask, pinMask, pos) (1u << GET_PIN_POS((bitMask), (pinMask), (pos)))
 
 #endif

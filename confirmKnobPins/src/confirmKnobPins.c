@@ -60,9 +60,10 @@ static struct KnobTransmission{
 void init_gpioPins(void){
     RCC->AHB2ENR |= RCC_AHB2ENR_GPIOBEN;
 
-    //set their modes to gp input with pull down for logic high 
+    //set their modes to gp input with pull up for logic low 
     GPIOB->MODER &= ~(GPIO_MODER_MODE3 | GPIO_MODER_MODE4 | GPIO_MODER_MODE5);
     GPIOB->PUPDR &= ~(GPIO_PUPDR_PUPD3 | GPIO_PUPDR_PUPD4 | GPIO_PUPDR_PUPD5);
+    GPIOB->PUPDR &= (GPIO_PUPDR_PUPD3_0 | GPIO_PUPDR_PUPD4_0 | GPIO_PUPDR_PUPD5_0);
 }
 
 //for each transition, assume a bad input unless proven otherwise
@@ -264,7 +265,7 @@ int main(void){
 
         // prevState = nextState;
         client_transmit(TO_BYTE_ARRAY(kt), sizeof(kt));
-        delay_us(1500);
+        delay_ms(2);
     }
 
     return 0;
