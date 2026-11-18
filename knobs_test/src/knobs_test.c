@@ -14,11 +14,10 @@ int main(void){
     
     //let's say that this knob is on pa5, pa6, pa7
     km1.pinMasks |= (
-        (5u << S1_POS) |
-        (6u << S2_POS) |
-        (7u << KEY_POS)
+        SET_PIN(5u, S1_MASK) |
+        SET_PIN(6u, S2_MASK) |
+        SET_PIN(7u, KEY_MASK)
     );
-
 
     //prove that (km.pinMasks & S1_MASK) will give us 5
     uint32_t s1 = km1.pinMasks & S1_MASK;

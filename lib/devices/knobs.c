@@ -13,93 +13,97 @@
  * kc11 module with the mask.
 */
 
+#define KNOB_KEY(idr, pinMask) ((idr) & GET_PIN_BIT((pinMask), KEY_MASK, KEY_POS))
+#define KNOB_S1(idr, pinMask) ((idr) & GET_PIN_BIT((pinMask), S1_MASK, S1_POS))
+#define KNOB_S2(idr, pinMask) ((idr) & GET_PIN_BIT((pinMask), S2_MASK, S2_POS))
+
 //for each transition, assume a bad input unless proven otherwise
-KnobStates transitionFrom_idle(const KnobMachine km, const uint32_t idr){
+KnobStates transitionFrom_idle(const KnobMachine *km, const uint32_t idr){
     //figure out how idle transitions to the other states
 
     //idle to invalid: key(s1 + s2)
-    if((idr & (km.pinMasks & KEY_MASK)) && (idr & (km.pinMasks & (S1_MASK | S2_MASK)))){
+    if(KNOB_KEY(idr, km->pinMasks) && KNOB_S1(idr, km->pinMasks) && KNOB_S2(idr, km->pinMasks)){
         return invalid;
     }
     
     //idle to pressed: key(!s1(!s2)))
-    if((idr & (km.pinMasks & KEY_MASK)) && (!(idr & (km.pinMasks & S1_MASK)) && !((km.pinMasks & S2_MASK)))){
+    if(KNOB_KEY(idr, km->pinMasks) && (!(KNOB_S1(idr, km->pinMasks)) && !(KNOB_S2(idr, km->pinMasks)))){
         return pressed;
     }
 
-    //idle to cw: prevS1(S1) + s1(!s2)
+    //idle to cw: prevS1(s1) + s1(!s2)
     if(
-        (km.prevS1 && (idr & (km.pinMasks & S1_MASK))) || //prevS1(S1)
-        ((idr & (km.pinMasks & S1_MASK)) && !((km.pinMasks & S2_MASK)))
+        ((km->prevS1) && (KNOB_S1(idr, km->pinMasks))) || //prevS1(s1)
+        ((KNOB_S1(idr, km->pinMasks)) && !(KNOB_S2(idr, km->pinMasks))) //s1(!s2)
     ){
         return cw;
     }
 
     //idle to ccw: !prevS1(s2) + !s1(s2)
     if(
-        (!km.prevS1 && ((km.pinMasks & S2_MASK))) || //!prevS1(s2)
-        (!(idr & (km.pinMasks & S1_MASK)) && ((km.pinMasks & S2_MASK)))
+        (!(km->prevS1) && (KNOB_S2(idr, km->pinMasks))) || 
+        (!(KNOB_S1(idr, km->pinMasks)) && (KNOB_S2(idr, km->pinMasks)))
     ){
         return ccw;
     }
 
     //idle to idle: !key(!s1)(!s2)
-    if(!(idr & (km.pinMasks & KEY_MASK)) && !(idr & (km.pinMasks & S1_MASK)) && (!((km.pinMasks & S2_MASK)))){
+    if(!KNOB_KEY(idr, km->pinMasks) && !KNOB_S1(idr, km->pinMasks) && !KNOB_S2(idr, km->pinMasks)){
         return idle;
     }
 
     return invalid; //returning invalid since the other states have those specific transition conditions
 }
 
-KnobStates transitionFrom_invalid(const KnobMachine km, const uint32_t idr){
+KnobStates transitionFrom_invalid(const KnobMachine *km, const uint32_t idr){
     //figure out how invalid transitions to the other states
 
     //invalid can only transition to idle
-    if(!(idr & (km.pinMasks & KEY_MASK)) && !(idr & (km.pinMasks & S1_MASK)) && (!((km.pinMasks & S2_MASK)))){
+    if(!KNOB_KEY(idr, km->pinMasks) && !KNOB_S1(idr, km->pinMasks) && !KNOB_S2(idr, km->pinMasks)){
         return idle;
     }
 
     return invalid;
 }
 
-KnobStates transitionFrom_pressed(const KnobMachine km, const uint32_t idr){
+KnobStates transitionFrom_pressed(const KnobMachine *km, const uint32_t idr){
     //figure out how invalid pressed to the other states
 
     //pressed to idle: !key(!s1(!s2)))
-    if(!(idr & (km.pinMasks & KEY_MASK)) && !(idr & (km.pinMasks & S1_MASK)) && (!((km.pinMasks & S2_MASK)))){
+    if(!KNOB_KEY(idr, km->pinMasks) && !KNOB_S1(idr, km->pinMasks) && !KNOB_S2(idr, km->pinMasks)){
         return idle;
     }
 
     //pressed to invalid: s1 + s2
-    if((idr & (km.pinMasks & S1_MASK)) || ((km.pinMasks & S2_MASK))){
+    if(KNOB_S1(idr, km->pinMasks) || KNOB_S2(idr, km->pinMasks)){
         return invalid;
     }
 
     return invalid;
 }
 
-KnobStates transitionFrom_cw(const KnobMachine km, const uint32_t idr){
+KnobStates transitionFrom_cw(const KnobMachine *km, const uint32_t idr){
     //figure out how cw transitions to the other states
 
     //cw to idle: !key(!s1)(!s2)
-    if(!(idr & (km.pinMasks & KEY_MASK)) && !(idr & (km.pinMasks & S1_MASK)) && (!((km.pinMasks & S2_MASK)))){
+    if(!KNOB_KEY(idr, km->pinMasks) && !KNOB_S1(idr, km->pinMasks) && !KNOB_S2(idr, km->pinMasks)){
         return idle;
     }
 
     //cw to invalid: key
-    if(idr & (km.pinMasks & KEY_MASK)){
+    if(KNOB_KEY(idr, km->pinMasks)){
         return invalid;
     }
 
     //cw to ccw: s2(!prevS1)
-    if(((km.pinMasks & S2_MASK)) && (!km.prevS1)){
+    if((KNOB_S2(idr, km->pinMasks)) && !(KNOB_S1(idr, km->pinMasks))){
         return ccw;
     }
 
     //cw to cw: s1(!s2) + !s1(s2)(prevs1)
     if(
-        ((idr & (km.pinMasks & S1_MASK)) && !((km.pinMasks & S2_MASK))) || //s1(!s2)
-        (!(idr & (km.pinMasks & S1_MASK)) && ((km.pinMasks & S2_MASK)) && km.prevS1)
+        ((KNOB_S1(idr, km->pinMasks)) && !(KNOB_S2(idr, km->pinMasks))) || 
+        (!(KNOB_S1(idr, km->pinMasks)) && (KNOB_S2(idr, km->pinMasks)) && (km->prevS1))
     ){
         return cw;
     }
@@ -107,31 +111,31 @@ KnobStates transitionFrom_cw(const KnobMachine km, const uint32_t idr){
     return invalid;
 }
 
-KnobStates transitionFrom_ccw(const KnobMachine km, const uint32_t idr){
+KnobStates transitionFrom_ccw(const KnobMachine *km, const uint32_t idr){
     //figure out how ccw transitions to the other states
 
     //ccw to idle: !key(!s1)(!s2)
-    if(!(idr & (km.pinMasks & KEY_MASK)) && !(idr & (km.pinMasks & S1_MASK)) && (!((km.pinMasks & S2_MASK)))){
+    if(!KNOB_KEY(idr, km->pinMasks) && !KNOB_S1(idr, km->pinMasks) && !KNOB_S2(idr, km->pinMasks)){
         return idle;
     }
 
     //ccw to invalid: key
-    if(idr & (km.pinMasks & KEY_MASK)){
+    if(KNOB_KEY(idr, km->pinMasks)){
         return invalid;
     }
 
     //ccw to cw: s1(s2) + !s2(s1)(prevS1)
     if(
-        ((idr & (km.pinMasks & S1_MASK)) && ((km.pinMasks & S2_MASK))) ||
-        (!((km.pinMasks & S2_MASK)) && (idr & (km.pinMasks & S1_MASK)) && km.prevS1)
+        ((KNOB_S1(idr, km->pinMasks)) && (KNOB_S2(idr, km->pinMasks))) ||
+        !(KNOB_S2(idr, km->pinMasks)) && (KNOB_S1(idr, km->pinMasks)) && (km->prevS1)
     ){
         return cw;
     }
 
     //ccw to ccw: s2(!s1) + s2(!prevS1)
     if(
-        (((km.pinMasks & S2_MASK)) && !(idr & (km.pinMasks & S1_MASK))) ||
-        (((km.pinMasks & S2_MASK)) && !km.prevS1)
+        ((KNOB_S2(idr, km->pinMasks)) && !(KNOB_S1(idr, km->pinMasks))) ||
+        ((KNOB_S2(idr, km->pinMasks)) && !(km->prevS1))
     ){
        return ccw; 
     }

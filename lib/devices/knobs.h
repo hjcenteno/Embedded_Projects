@@ -57,10 +57,10 @@ typedef struct knobMachine{
 } KnobMachine;
 
 //ensure each knob pins share the same gpio peripheral
-KnobStates transitionFrom_idle(const KnobMachine km, const uint32_t idr);
-KnobStates transitionFrom_invalid(const KnobMachine km, const uint32_t idr);
-KnobStates transitionFrom_pressed(const KnobMachine km, const uint32_t idr);
-KnobStates transitionFrom_cw(const KnobMachine km, const uint32_t idr);
-KnobStates transitionFrom_ccw(const KnobMachine km, const uint32_t idr);
+KnobStates transitionFrom_idle(const KnobMachine *km, const uint32_t idr);
+KnobStates transitionFrom_invalid(const KnobMachine *km, const uint32_t idr);
+KnobStates transitionFrom_pressed(const KnobMachine *km, const uint32_t idr);
+KnobStates transitionFrom_cw(const KnobMachine *km, const uint32_t idr);
+KnobStates transitionFrom_ccw(const KnobMachine *km, const uint32_t idr);
 
 #endif 
