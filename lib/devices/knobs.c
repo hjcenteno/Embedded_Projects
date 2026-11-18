@@ -127,7 +127,7 @@ KnobStates transitionFrom_ccw(const KnobMachine *km, const uint32_t idr){
     //ccw to cw: s1(s2) + !s2(s1)(prevS1)
     if(
         ((KNOB_S1(idr, km->pinMasks)) && (KNOB_S2(idr, km->pinMasks))) ||
-        !(KNOB_S2(idr, km->pinMasks)) && (KNOB_S1(idr, km->pinMasks)) && (km->prevS1)
+        (!(KNOB_S2(idr, km->pinMasks)) && (KNOB_S1(idr, km->pinMasks)) && (km->prevS1))
     ){
         return cw;
     }
