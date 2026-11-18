@@ -21,5 +21,8 @@ int main(void){
 
 
     //prove that (km.pinMasks & S1_MASK) will give us 5
-    km1.pinMasks & S1_MASK;
+    uint32_t s1 = km1.pinMasks & S1_MASK;
+    s1 += 0;
+
+    return 0;
 }

@@ -3,7 +3,7 @@
     Description:
         Implemenation of the knobs header file. It is the responsibility of the user to 
         ensure each pin of the kc11 rotary encoder share the same gpio peripheral cause I don't
-        feel like handling that case.
+        feel like handling that
 */
 
 #include "knobs.h"
