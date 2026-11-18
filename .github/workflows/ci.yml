@@ -48,6 +48,14 @@ jobs:
             gcc-arm-none-eabi libnewlib-arm-none-eabi \
             cppcheck clang-tidy clang clang-tools cmake
 
+      - name: Print tool versions
+        run: |
+          lsb_release -ds
+          arm-none-eabi-gcc --version | head -1
+          clang-tidy --version | head -2
+          cppcheck --version
+          cmake --version | head -1
+
       - name: Cache CMSIS
         uses: actions/cache@v6
         with:
