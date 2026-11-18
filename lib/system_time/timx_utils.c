@@ -87,7 +87,7 @@ int init_tim(TIM_TypeDef *timX){
     return 0;
 }
 
-void delay_us(TIM_TypeDef *timX, uint32_t microseconds){
+void delay_us(const TIM_TypeDef *timX, uint32_t microseconds){
     //amount of time to delay in microseconds (max of 2^32 -1 microseconds)
     /*
         max amount is simply because a uint32_t can only store a maximum of 2^32 - 1
@@ -113,7 +113,7 @@ void delay_us(TIM_TypeDef *timX, uint32_t microseconds){
 } 
 
 //delay is done in microseconds, so when adding new delay functions, convert the time to microseconds)
-void delay_ms(TIM_TypeDef *timX, uint32_t milliseconds){
+void delay_ms(const TIM_TypeDef *timX, uint32_t milliseconds){
     //amount of time to delay in milliseconds (max 4294000 milliseconds)
     //the max amount comes from (2^32 -1) / 1000
     if(milliseconds > 4294000){
@@ -125,7 +125,7 @@ void delay_ms(TIM_TypeDef *timX, uint32_t milliseconds){
     delay_us(timX, delay);
 } 
 
-void delay_s(TIM_TypeDef *timX, uint32_t seconds){
+void delay_s(const TIM_TypeDef *timX, uint32_t seconds){
     //amount of time to delay in seconds (max one hour)
     //the max of one hour is because 2^32 - 1 microseconds is roughly 1.2 hours
     if(seconds > 3600){
@@ -167,7 +167,7 @@ int cfgr_tim_ccmr2(TIM_TypeDef *timX, const uint32_t io_ccrmr_msk, const uint32_
     return 0;    
 }
 
-uint32_t update_pwm_dutyCycle(TIM_TypeDef *timX, float target_dc){
+uint32_t update_pwm_dutyCycle(const TIM_TypeDef *timX, float target_dc){
     //duty_cycle = (timX->ccrX / timX->arr) * 100
     //ensure the target_dc is between [0, 100]
     if(target_dc > 100){

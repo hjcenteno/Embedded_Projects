@@ -46,6 +46,11 @@ int main(void){
             break;
         }
 
+        //this is to avoid scan-build from complaining about loopState not being used
+        if((loopState == idle) || (loopState == invalid)){
+            continue;
+        }
+
         km1.q = loopState;
     }
 

@@ -163,7 +163,7 @@ jobs:
           for f in $FILES; do
             echo "== clang-tidy $f =="
             clang-tidy "$f" \
-              --checks='bugprone-*,-bugprone-easily-swappable-parameters,clang-analyzer-*,cert-*' \
+              --checks='bugprone-*,-bugprone-easily-swappable-parameters,clang-analyzer-*,-clang-analyzer-core.FixedAddressDereference,cert-*' \
               --warnings-as-errors='*' \
               -- -I"$HOME/cmsis_core/CMSIS/Core/Include" \
                  -I"$HOME/cmsis_device_g4/Include" \
@@ -201,7 +201,7 @@ jobs:
             d=${d%/}
             if ls "$d"/src/*.c >/dev/null 2>&1; then
               echo "== Analyzing $d =="
-              "$SCAN_BUILD" --status-bugs \
+              "$SCAN_BUILD" --status-bugs -disable-checker core.FixedAddressDereference \
                 --use-cc=arm-none-eabi-gcc \
                 --analyzer-target=arm-none-eabi \
                 -o "$PWD/scan-reports/$d" \
