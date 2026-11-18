@@ -25,7 +25,6 @@ int main(void){
     //going to use qemu to simulate the behaviors and using gdp set var to change a_idr
     while(1){
         KnobStates loopState = km1.q;
-
         switch (km1.q){
         case idle:
             loopState = transitionFrom_idle(&km1, a_idr);
@@ -43,6 +42,7 @@ int main(void){
             loopState = transitionFrom_ccw(&km1, a_idr);
             break;
         default:
+            km1.q = loopState;
             break;
         }
 
@@ -51,7 +51,6 @@ int main(void){
             continue;
         }
 
-        km1.q = loopState;
     }
 
     return 0;
