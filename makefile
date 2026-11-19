@@ -44,6 +44,14 @@ PROGRAMS := $(basename $(notdir $(wildcard $(SRC_DIR)/*.c)))
 PROJECTS := $(sort $(foreach f,$(wildcard */src/*.c),$(firstword $(subst /, ,$(f)))))
 MAKEFILE_PATH := $(abspath $(firstword $(MAKEFILE_LIST)))
 
+# `make sim <project>` / `make debugsim <project>`: the extra word is the
+# project name. It's pulled out here (before PROJECT_template runs) so that
+# project is skipped by the foreach below -- otherwise its build rule would
+# clash with the no-op rule that stops make from building it as a goal.
+ifneq ($(filter sim debugsim,$(firstword $(MAKECMDGOALS))),)
+SIM_PROJECT := $(word 2,$(MAKECMDGOALS))
+endif
+
 define PROJECT_template
 .PHONY: $(1) flash-$(1) disarm-$(1) clean-$(1)
 $(1):
@@ -59,7 +67,52 @@ clean-$(1):
 	$$(MAKE) -C $(1) -f $$(MAKEFILE_PATH) clean
 endef
 
-$(foreach proj,$(PROJECTS),$(eval $(call PROJECT_template,$(proj))))
+$(foreach proj,$(filter-out $(SIM_PROJECT),$(PROJECTS)),$(eval $(call PROJECT_template,$(proj))))
+
+ifneq ($(SIM_PROJECT),)
+$(eval .PHONY: $(SIM_PROJECT))
+$(eval $(SIM_PROJECT):;@:)
+endif
+
+# `make sim <project>`: build the project, write <project>/debug.gdb, then
+# ask whether to start QEMU (netduinoplus2, halted, GDB server on :3333).
+# QEMU runs in the foreground of this terminal, so run `make debugsim
+# <project>` from a second terminal. Exit QEMU with Ctrl-A X.
+#
+# `make debugsim <project>`: attach gdb-multiarch using that debug.gdb, and
+# kill QEMU when gdb exits.
+#
+# Both are top-level only (they need the project list), and both use paths
+# relative to Embedded_Projects/, matching the sample debug.gdb.
+SIM_ELF := $(SIM_PROJECT)/bin/$(SIM_PROJECT).elf
+SIM_GDB := $(SIM_PROJECT)/debug.gdb
+QEMU_CMD = qemu-system-arm -M netduinoplus2 -nographic -S -gdb tcp::3333 -kernel $(SIM_ELF)
+
+.PHONY: sim debugsim
+ifneq ($(PROJECTS),)
+sim:
+ifeq ($(SIM_PROJECT),)
+	$(error Usage: make sim <project>)
+endif
+ifeq ($(filter $(SIM_PROJECT),$(PROJECTS)),)
+	$(error Unknown project '$(SIM_PROJECT)' -- run `make list` to see projects)
+endif
+	@printf 'file %s\ntarget remote :3333\ntbreak main\ncontinue\nlayout src\n' '$(SIM_ELF)' > $(SIM_GDB)
+	@echo "created $(SIM_GDB)"
+	@printf 'Run "%s"? [y/N] ' '$(QEMU_CMD)'; \
+	read ans; \
+	case "$$ans" in \
+	  [yY]*) $(QEMU_CMD) ;; \
+	  *) echo "not started -- run it yourself, then: make debugsim $(SIM_PROJECT)" ;; \
+	esac
+
+debugsim:
+ifeq ($(SIM_PROJECT),)
+	$(error Usage: make debugsim <project>)
+endif
+	@test -f $(SIM_GDB) || { echo "$(SIM_GDB) not found -- run: make sim $(SIM_PROJECT)"; exit 1; }
+	gdb-multiarch -x $(SIM_GDB) ; pkill qemu-system-arm || true
+endif
 
 # Support `make clean <project> [<project> ...]` from the top level:
 # extra words after "clean" are project names whose bin/ should be
@@ -314,6 +367,8 @@ HELP:
 	@echo "  make lib <name>|<dir>/<name>     compile the given lib source file for a syntax check, does not link"
 	@echo "  make newlib <name>|<dir>/<name>  create a lib source/header pair (new dir, or add to an existing one)"
 	@echo "  make listlib                     list every library available under the lib directory"
+	@echo "  make sim <project>               build, write <project>/debug.gdb, and offer to start QEMU (netduinoplus2) halted with a GDB server on :3333"
+	@echo "  make debugsim <project>          run gdb-multiarch with <project>/debug.gdb, then kill QEMU (use a second terminal)"
 	@echo "  make HELP                        show this message"
 ifneq ($(PROJECTS),)
 	@echo ""
