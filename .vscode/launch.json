@@ -18,6 +18,19 @@
             "device": "STM32G474RE",
             "runToEntryPoint": "main",
             "preLaunchTask": "Build project"
+        },
+        {
+            "name": "Debug STM32 project (QEMU sim)",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/${input:projectName}/bin/${input:projectName}.elf",
+            "request": "launch",
+            "type": "cortex-debug",
+            "servertype": "external",
+            "gdbTarget": "localhost:3333",
+            "gdbPath": "gdb-multiarch",
+            "runToEntryPoint": "main",
+            "preLaunchTask": "Build and start QEMU",
+            "postDebugTask": "Stop QEMU"
         }
     ],
     "inputs": [

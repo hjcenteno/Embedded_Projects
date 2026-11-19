@@ -1,5 +1,5 @@
 /Private
-*.gdb
+
 # Prerequisites
 *.d
 
@@ -46,6 +46,7 @@
 *.su
 *.idb
 *.pdb
+*.gdb
 
 # Kernel Module Compile Results
 *.mod*

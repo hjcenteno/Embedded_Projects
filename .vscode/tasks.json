@@ -1,3 +1,4 @@
+
 {
     "version": "2.0.0",
     "tasks": [
@@ -13,6 +14,36 @@
                 "kind": "build",
                 "isDefault": true
             }
+        },
+        {
+            // Starts QEMU halted (-S) with a GDB server on :3333, same command
+            // as `make sim`. Runs in the background; "QEMU ready" is echoed
+            // after a short delay so the debugger waits for the server.
+            "label": "Start QEMU",
+            "type": "shell",
+            "command": "qemu-system-arm -M netduinoplus2 -nographic -S -gdb tcp::3333 -kernel ${workspaceFolder}/${input:projectName}/bin/${input:projectName}.elf & sleep 1; echo QEMU ready; wait",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "isBackground": true,
+            "problemMatcher": {
+                "pattern": { "regexp": "^__never_matches__$" },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^__never_matches__$",
+                    "endsPattern": "QEMU ready"
+                }
+            }
+        },
+        {
+            "label": "Build and start QEMU",
+            "dependsOrder": "sequence",
+            "dependsOn": ["Build project", "Start QEMU"]
+        },
+        {
+            "label": "Stop QEMU",
+            "type": "shell",
+            "command": "pkill qemu-system-arm || true"
         }
     ],
     "inputs": [
@@ -23,3 +54,4 @@
         }
     ]
 }
+ 
