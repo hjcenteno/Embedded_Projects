@@ -22,7 +22,7 @@ KnobStates transitionFrom_idle(const KnobMachine *km, const uint32_t idr){
     //figure out how idle transitions to the other states
 
     //idle to invalid: key(s1 + s2)
-    if(KNOB_KEY(idr, km->pinMasks) && KNOB_S1(idr, km->pinMasks) && KNOB_S2(idr, km->pinMasks)){
+    if(KNOB_KEY(idr, km->pinMasks) && KNOB_S1(idr, km->pinMasks) || KNOB_S2(idr, km->pinMasks)){
         return invalid;
     }
     
@@ -96,7 +96,7 @@ KnobStates transitionFrom_cw(const KnobMachine *km, const uint32_t idr){
     }
 
     //cw to ccw: s2(!prevS1)
-    if((KNOB_S2(idr, km->pinMasks)) && !(KNOB_S1(idr, km->pinMasks))){
+    if((KNOB_S2(idr, km->pinMasks)) && !(km->prevS1)){
         return ccw;
     }
 
