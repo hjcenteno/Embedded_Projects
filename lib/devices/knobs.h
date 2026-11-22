@@ -32,6 +32,10 @@
 #define KEY_MASK_2 (4u << KEY_POS)
 #define KEY_MASK_3 (8u << KEY_POS)
 
+#define KNOB_KEY(idr, pinMask) ((idr) & GET_PIN_BIT((pinMask), KEY_MASK, KEY_POS))
+#define KNOB_S1(idr, pinMask) ((idr) & GET_PIN_BIT((pinMask), S1_MASK, S1_POS))
+#define KNOB_S2(idr, pinMask) ((idr) & GET_PIN_BIT((pinMask), S2_MASK, S2_POS))
+
 typedef enum KnobStates : uint8_t{
     idle = 0,
     invalid = 1,
