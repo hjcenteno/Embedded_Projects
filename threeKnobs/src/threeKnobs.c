@@ -40,10 +40,10 @@
 #define MIN_DC_STEP (-1.0f)
 
 //between 250 us and 5000 us
-#define DT_STEP (1u)
-#define MAX_DT_STEP (10u)
-#define MIN_DT_STEP (-10u)
-#define MAX_DT_US (5000)
+#define DT_STEP (1)
+#define MAX_DT_STEP (10)
+#define MIN_DT_STEP (1)
+#define MAX_DT_US (5000u)
 #define MIN_DT_US (250u)
 
 typedef struct pwm_t{
@@ -169,10 +169,10 @@ void update_dutyCycle(const KnobStates q, float *step, float *dc){
     }
 }
 
-void update_deltaTime(const KnobStates q, uint32_t *step, uint32_t *dt){
+void update_deltaTime(const KnobStates q, int32_t *step, uint32_t *dt){
     //dt is left as a uint32 because it will act as the argument for the delay
-    uint32_t newStep = *step;
-    uint32_t newDT = *dt;
+    int32_t newStep = *step;
+    int32_t newDT = (int32_t)*dt; //to allow for the newStep to subtract the newDT
 
     switch(q){
         case idle:
@@ -182,7 +182,7 @@ void update_deltaTime(const KnobStates q, uint32_t *step, uint32_t *dt){
             newStep += DT_STEP;
             newStep = CLAMP(MIN_DT_STEP, newStep, MAX_DT_STEP);
 
-            if((newStep == MIN_DT_STEP) || (newStep == MAX_DC_STEP)){
+            if((newStep == MIN_DT_STEP) || (newStep == MAX_DT_STEP)){
                 newStep *= -1;
             }
 
@@ -190,11 +190,11 @@ void update_deltaTime(const KnobStates q, uint32_t *step, uint32_t *dt){
             break;
         case cw:
             newDT += newStep;
-            *dt = CLAMP(MIN_DT_US, newDT, MAX_DT_US);
+            *dt = (uint32_t)CLAMP(MIN_DT_US, (uint32_t)newDT, MAX_DT_US);
             break;
         case ccw:
             newDT -= newStep;
-            *dt = CLAMP(MIN_DT_US, newDT, MAX_DT_US);
+            *dt = (uint32_t)CLAMP(MIN_DT_US, (uint32_t)newDT, MAX_DT_US);
             break;
         default:
             break;
@@ -213,7 +213,7 @@ int main(void){
     PWM_T pwm = {
         .freq = 1000,
         .dc = 50,
-        .deltaTime = 0,
+        .deltaTime = MIN_DT_US,
     };
 
     //set up the knob machines
@@ -245,7 +245,7 @@ int main(void){
     float freqStep = FREQ_STEP;
     float dcStep = DC_STEP;
     //the dtStep is a uint32 since the argument for the delay functions only take in a uint32
-    uint32_t dtStep = DT_STEP;
+    int32_t dtStep = DT_STEP;
 
     while(1){
         const uint32_t a_idr = ~GPIOA->IDR;
