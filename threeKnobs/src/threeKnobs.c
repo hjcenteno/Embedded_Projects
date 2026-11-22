@@ -172,7 +172,7 @@ void update_dutyCycle(const KnobStates q, float *step, float *dc){
 void update_deltaTime(const KnobStates q, uint32_t *step, uint32_t *dt){
     //dt is left as a uint32 because it will act as the argument for the delay
     uint32_t newStep = *step;
-    float newDT = *dt;
+    uint32_t newDT = *dt;
 
     switch(q){
         case idle:
