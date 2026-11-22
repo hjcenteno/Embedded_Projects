@@ -1,5 +1,12 @@
 {
-  "C_Cpp.intelliSenseEngine": "disabled",
-  "C_Cpp.autocomplete": "disabled",
-  "C_Cpp.errorSquiggles": "disabled"
+  "C_Cpp.intelliSenseEngine": "default",
+  "C_Cpp.autocomplete": "default",
+  "C_Cpp.errorSquiggles": "enabled",
+
+  "C_Cpp.files.exclude": { "**/bin/**": true, "**/.git/**": true },
+  "files.watcherExclude": { "**/bin/**": true },
+  "search.exclude": { "**/bin/**": true },
+  "C_Cpp.intelliSenseMemoryLimit": 2048,
+  "C_Cpp.intelliSenseCacheSize": 5120,
+  "C_Cpp.default.browse.limitSymbolsToIncludedHeaders": true
 }

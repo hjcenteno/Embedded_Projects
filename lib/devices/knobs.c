@@ -13,10 +13,6 @@
  * kc11 module with the mask.
 */
 
-#define KNOB_KEY(idr, pinMask) ((idr) & GET_PIN_BIT((pinMask), KEY_MASK, KEY_POS))
-#define KNOB_S1(idr, pinMask) ((idr) & GET_PIN_BIT((pinMask), S1_MASK, S1_POS))
-#define KNOB_S2(idr, pinMask) ((idr) & GET_PIN_BIT((pinMask), S2_MASK, S2_POS))
-
 //for each transition, assume a bad input unless proven otherwise
 KnobStates transitionFrom_idle(const KnobMachine *km, const uint32_t idr){
     //figure out how idle transitions to the other states
