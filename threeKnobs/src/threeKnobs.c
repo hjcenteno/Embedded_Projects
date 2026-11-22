@@ -193,6 +193,8 @@ void update_deltaTime(const KnobStates q, uint32_t *step, uint32_t *dt){
             *dt = CLAMP(MIN_DT_US, newDT, MAX_DT_US);
             break;
         case ccw:
+            newDT -= newStep;
+            *dt = CLAMP(MIN_DT_US, newDT, MAX_DT_US);
             break;
         default:
             break;
