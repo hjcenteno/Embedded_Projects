@@ -37,6 +37,7 @@ typedef enum spi_br_t : uint8_t{
     master only as that's what I need at the moment.
     For simplicity, the spi can either be full duplex or simplex.
     Then rxonly determines whether for simplex to be either transmit-only or recieve-only
+    the frame definition in cr2 and enabling the SPE bit in cr1 are left to the user
 */
 int init_spi(SPI_TypeDef *spiX, const SPI_Config spi_timing, const SPI_BR br, const bool lsb, const bool rxonly);
 
@@ -44,11 +45,11 @@ int init_spi(SPI_TypeDef *spiX, const SPI_Config spi_timing, const SPI_BR br, co
     For both the miso and mosi functions, the user is responsible for creating the 
     idle state for communicating, the dma functions will handle the dma stuff
 */
-int spi_mosi(SPI_TypeDef *spiX, const uint8_t* data, const uint8_t dataLen);
-int spi_miso(SPI_TypeDef *spiX, const uint8_t* buffer, const uint8_t bufLen);
+int spi_mosi(SPI_TypeDef *spiX, const uint8_t* data, const uint32_t dataLen);
+int spi_miso(SPI_TypeDef *spiX, const uint8_t* buffer, const uint32_t bufLen);
 
-int spi_mosi_dma(SPI_TypeDef *spiX, DMA_TypeDef dmaX, const uint8_t* data, const uint8_t dataLen);
-int spi_miso_dma(SPI_TypeDef *spiX, DMA_TypeDef dmaX, const uint8_t* buffer, const uint8_t bufLen);
+int spi_mosi_dma(SPI_TypeDef *spiX, DMA_TypeDef dmaX, const uint8_t* data, const uint32_t dataLen);
+int spi_miso_dma(SPI_TypeDef *spiX, DMA_TypeDef dmaX, const uint8_t* buffer, const uint32_t bufLen);
 
 
 

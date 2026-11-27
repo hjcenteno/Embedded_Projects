@@ -5,6 +5,7 @@
 */
 
 #include "spi_driver.h"
+#include "stm32g474xx.h"
 
 int init_spi(SPI_TypeDef *spiX, const SPI_Config spi_timing, const SPI_BR br, const bool lsb, const bool rxonly){
     //following the procedure of configuring the SPI per page 1838 of the reference manual
@@ -17,7 +18,7 @@ int init_spi(SPI_TypeDef *spiX, const SPI_Config spi_timing, const SPI_BR br, co
     spiX->CR1 = 0;
 
     //mcu will always be master
-    spiX->CR1 |= SPI_CR1_MSTR;
+    spiX->CR1 |= (SPI_CR1_MSTR | SPI_CR1_SSI | SPI_CR1_SSM);
 
     //configure the serial clock baud rate
     switch(br){
@@ -73,13 +74,33 @@ int init_spi(SPI_TypeDef *spiX, const SPI_Config spi_timing, const SPI_BR br, co
     if(rxonly){ //rxonly and bidimmode cannot be set at the same time
         spiX->CR1 |= SPI_CR1_RXONLY;
     }
-    
-    //now write the cr2
-    //going to configure for 16-bit data size
-    spiX->CR2 |= (SPI_CR2_DS_3 | SPI_CR2_DS_2 | SPI_CR2_DS_1 | SPI_CR2_DS_0);
-
-    //enable the spi
-    spiX->CR1 |= SPI_CR1_SPE;
 
     return 0;
 }
+
+int spi_mosi(SPI_TypeDef *spiX, const uint8_t* data, const uint32_t dataLen){
+    //following the procedure for transmission laid out in page 1839 of the RM
+    //wait until the spi is not busy
+    volatile uint16_t MAX_TMEOUT = 0xFFFF; //maximum cpu clock cycles to wait for the spi bus to not be busy
+    while(spiX->SR & SPI_SR_BSY){
+        if((--MAX_TMEOUT) == 0){
+            return 1; //busy timeout
+        }
+    }
+
+    //for each byte of the data, send it if its not consider full defined as 11 for the ftvlv
+    for(uint32_t i = 0; i < dataLen; i++){
+        //only write if the txfifo is half empty
+        while((spiX->SR & SPI_SR_FTLVL) == SPI_SR_FTLVL){}
+
+        //since the DR is a uint32_t register, to avoid the data being fil
+        spiX->DR = data[i];
+    }
+    
+    return 0;
+}
+
+// int spi_miso(SPI_TypeDef *spiX, const uint8_t* buffer, const uint32_t bufLen);
+
+// int spi_mosi_dma(SPI_TypeDef *spiX, DMA_TypeDef dmaX, const uint8_t* data, const uint32_t dataLen);
+// int spi_miso_dma(SPI_TypeDef *spiX, DMA_TypeDef dmaX, const uint8_t* buffer, const uint32_t bufLen);
