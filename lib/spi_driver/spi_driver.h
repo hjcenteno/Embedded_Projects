@@ -45,12 +45,15 @@ int init_spi(SPI_TypeDef *spiX, const SPI_Config spi_timing, const SPI_BR br, co
     For both the miso and mosi functions, the user is responsible for creating the 
     idle state for communicating, the dma functions will handle the dma stuff
 */
-int spi_mosi(SPI_TypeDef *spiX, const uint8_t* data, const uint32_t dataLen);
-int spi_miso(SPI_TypeDef *spiX, const uint8_t* buffer, const uint32_t bufLen);
+int spi_mosi_8bit(SPI_TypeDef *spiX, const uint8_t* data, const uint32_t dataLen);
+int spi_mosi_16bit(SPI_TypeDef *spiX, const uint16_t* data, const uint32_t dataLen);
+int spi_miso_8bit(SPI_TypeDef *spiX, const uint8_t* buffer, const uint32_t bufLen);
+int spi_miso_16bit(SPI_TypeDef *spiX, const uint16_t* buffer, const uint32_t bufLen);
 
-int spi_mosi_dma(SPI_TypeDef *spiX, DMA_TypeDef dmaX, const uint8_t* data, const uint32_t dataLen);
-int spi_miso_dma(SPI_TypeDef *spiX, DMA_TypeDef dmaX, const uint8_t* buffer, const uint32_t bufLen);
-
+int spi_dma_mosi_8bit(SPI_TypeDef *spiX, const uint8_t* data, const uint32_t dataLen);
+int spi_dma_mosi_16bit(SPI_TypeDef *spiX, const uint16_t* data, const uint32_t dataLen);
+int spi_dma_miso_8bit(SPI_TypeDef *spiX, const uint8_t* buffer, const uint32_t bufLen);
+int spi_dma_miso_16bit(SPI_TypeDef *spiX, const uint16_t* buffer, const uint32_t bufLen);
 
 
 #endif
