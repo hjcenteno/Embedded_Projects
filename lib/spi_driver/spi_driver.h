@@ -30,6 +30,13 @@ typedef enum spi_br_t : uint8_t{
     SPI_BR_256 //@16Mhz HSI: 0.06 Mhz, @24 Mhz HSE: 0.09375 Mhz
 }SPI_BR;
 
+typedef enum spi_mode_t : uint8_t{
+    full_duplex,
+    half_duplex,
+    simplex_txonly,
+    simplex_rxonly
+}SPI_Mode;
+
 /*
     The user must enable SPI in the RCC, define the gpio pins, 
     but the function itself will handle the register stuff for 
@@ -39,7 +46,16 @@ typedef enum spi_br_t : uint8_t{
     Then rxonly determines whether for simplex to be either transmit-only or recieve-only
     the frame definition in cr2 and enabling the SPE bit in cr1 are left to the user
 */
-int init_spi(SPI_TypeDef *spiX, const SPI_Config spi_timing, const SPI_BR br, const bool lsb, const bool rxonly);
+int init_spi(SPI_TypeDef *spiX, const SPI_Config spi_timing, const SPI_BR br, const bool lsb, const SPI_Mode mode);
+
+int disable_spi(SPI_TypeDef *spiX);
+
+static inline void enable_spi(SPI_TypeDef *spiX){
+    spiX->CR1 |= SPI_CR1_SPE;
+}
+
+//the data size can either be 8/16 bits, use it either before enabling the spi, or after communication
+void set_spi_dataSize(SPI_TypeDef *spiX, const bool use16Bits);
 
 /*
     For both the miso and mosi functions, the user is responsible for creating the 

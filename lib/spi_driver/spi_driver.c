@@ -7,7 +7,7 @@
 #include "spi_driver.h"
 #include "stm32g474xx.h"
 
-int init_spi(SPI_TypeDef *spiX, const SPI_Config spi_timing, const SPI_BR br, const bool lsb, const bool rxonly){
+int init_spi(SPI_TypeDef *spiX, const SPI_Config spi_timing, const SPI_BR br, const bool lsb, SPI_Mode mode){
     //following the procedure of configuring the SPI per page 1838 of the reference manual
     //error check args
     if(spiX == NULL){
@@ -65,18 +65,54 @@ int init_spi(SPI_TypeDef *spiX, const SPI_Config spi_timing, const SPI_BR br, co
         default:
             return 1; //the spi config was something else
     }
+    
+    //configure per the mode
+    switch(mode){
+        case full_duplex: //full duplex is set as the defualt config
+            break;
+        case half_duplex:
+            spiX->CR1 |= (SPI_CR1_BIDIMODE);
+            break;
+        case simplex_rxonly:
+            spiX->CR1 |= (SPI_CR1_RXONLY | SPI_CR1_BIDIOE);
+            break;
+        case simplex_txonly:
+            spiX->CR1 |= (SPI_CR1_BIDIMODE | SPI_CR1_BIDIOE);
+            break;
+        default:
+            break;
+    }
 
     //spi is assumed to be msb
     if(lsb){
         spiX->CR1 |= SPI_CR1_LSBFIRST;
     }
-
-    if(rxonly){ //rxonly and bidimmode cannot be set at the same time
-        spiX->CR1 |= SPI_CR1_RXONLY;
-    }
+    
 
     return 0;
 }
+
+void set_spi_dataSize(SPI_TypeDef *spiX, const bool use16Bits){
+    if(spiX == NULL){
+        return;
+    }
+
+    //disable the spi if its set
+    if(spiX->CR1 & SPI_CR1_SPE){
+        spiX->CR1 &= ~SPI_CR1_SPE; //clear that bit
+    }
+
+    //clear the ds already present for the spi
+    spiX->CR2 &= ~SPI_CR2_DS;
+
+    //8-bit will be the default
+    if(use16Bits){
+        spiX->CR2 |= SPI_CR2_DS;
+    }else{
+        spiX->CR2 |= SET_PIN(7u, SPI_CR2_DS_Pos);
+    }
+}
+
 
 int spi_mosi_8bit(SPI_TypeDef *spiX, const uint8_t* data, const uint32_t dataLen){
     //following the procedure for transmission laid out in page 1839 of the RM
@@ -110,6 +146,14 @@ int spi_mosi_8bit(SPI_TypeDef *spiX, const uint8_t* data, const uint32_t dataLen
         }
     }
 
+    //then wait for it to not be busy
+    MAX_TMEOUT = 0xFFFF; //reset the timeout
+    while(spiX->SR & SPI_SR_BSY){
+        if((--MAX_TMEOUT) == 0){
+            return 1; //busy timeout
+        }
+    }
+
     return 0;
 }
 
@@ -138,6 +182,14 @@ volatile uint16_t MAX_TMEOUT = 0xFFFF; //maximum cpu clock cycles to wait for th
     //wait until the txfifo is empty
     MAX_TMEOUT = 0xFFFF; //reset the timeout
     while((spiX->SR & SPI_SR_TXE) == 0){
+        if((--MAX_TMEOUT) == 0){
+            return 1; //busy timeout
+        }
+    }
+
+    //then wait for it to not be busy
+    MAX_TMEOUT = 0xFFFF; //reset the timeout
+    while(spiX->SR & SPI_SR_BSY){
         if((--MAX_TMEOUT) == 0){
             return 1; //busy timeout
         }
