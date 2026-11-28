@@ -255,7 +255,7 @@ int i2c_master_write(uint8_t saddr, uint8_t regaddr, const uint8_t *data, uint8_
     }
 
     //only transmit if communication is not being processed
-   uint32_t busy_timeout = MAX_TIMEOUT; //max amount of iterations the isr busy can wait for
+   volatile uint32_t busy_timeout = MAX_TIMEOUT; //max amount of iterations the isr busy can wait for
     while(I2C1->ISR & I2C_ISR_BUSY){
         if((--busy_timeout) == 0){
             return 1;
@@ -300,7 +300,7 @@ int i2c_master_read(uint8_t saddr, uint8_t regaddr, uint8_t *data, uint8_t dLeng
     }
 
     //only read if communication is not being processed
-    uint32_t busy_timeout = MAX_TIMEOUT; //max amount of iterations the isr busy can wait for
+    volatile uint32_t busy_timeout = MAX_TIMEOUT; //max amount of iterations the isr busy can wait for
     while(I2C1->ISR & I2C_ISR_BUSY){
         if((--busy_timeout) == 0){
             return 1;
